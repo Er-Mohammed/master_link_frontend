@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 350 100" width="350" height="100">
+  <!-- Master Link Geometric Emblem: Solid Red Block with flat top/left, slanted right edge, 2 triangle cutouts + vertical bar -->
+  <g fill="#EE202E">
+    <path d="M 0 0 H 158 L 126 100 H 90 L 109 20 L 72 100 L 53 20 L 18 100 H 0 Z" />
+    <rect x="174" y="0" width="22" height="100" rx="2" />
+  </g>
+  <!-- Stacked Brand Text -->
+  <text x="212" y="48" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-weight="800" font-size="52" fill="#1A1D20" letter-spacing="-1">Master</text>
+  <text x="212" y="92" font-family="'Plus Jakarta Sans', system-ui, sans-serif" font-weight="400" font-size="44" fill="#1A1D20" letter-spacing="-1">link</text>
+</svg>

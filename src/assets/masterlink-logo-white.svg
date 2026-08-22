@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 350 100" fill="none">
+  <!-- Emblem in Vibrant MasterLink Brand Red -->
+  <path fill-rule="evenodd" clip-rule="evenodd" d="M0 0H120V100H0V0ZM30 0L12 100H48L30 0ZM90 0L72 100H108L90 0Z" fill="#F20530"/>
+  <rect x="134" y="0" width="22" height="100" rx="2" fill="#F20530"/>
+  
+  <!-- High Contrast Brand Text: "Master" in White, "link" in Slate Grey -->
+  <text x="175" y="44" font-family="'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" font-weight="900" font-size="48" fill="#FFFFFF" letter-spacing="-0.02em">Master</text>
+  <text x="175" y="90" font-family="'Plus Jakarta Sans', system-ui, -apple-system, sans-serif" font-weight="800" font-size="46" fill="#CBD5E1" letter-spacing="-0.02em">link</text>
+</svg>

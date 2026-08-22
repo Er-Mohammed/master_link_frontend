@@ -1,78 +1,20 @@
-# MasterLink Frontend
+<div align="center">
+<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
+</div>
 
-The official frontend for **MasterLink Technology & Digital Marketing**, built with **React, TypeScript, and Vite**.
+# Run and deploy your AI Studio app
 
-MasterLink is a modern bilingual company website and administrative dashboard designed to showcase digital services, projects, client work, testimonials, and company content while providing a secure interface for managing the platform.
+This contains everything you need to run your app locally.
 
-## Tech Stack
+View your app in AI Studio: https://ai.studio/apps/1d75ea27-c6b5-48cc-ab38-b54e0646c288
 
-* React 19
-* TypeScript
-* Vite
-* Tailwind CSS
-* Axios
-* Motion
-* Laravel Sanctum
-* REST API
+## Run Locally
 
-## Features
+**Prerequisites:**  Node.js
 
-* Responsive Arabic and English website
-* Services and projects showcase
-* Client logos and testimonials
-* Consultation interface
-* Admin authentication
-* Role-based permissions
-* Protected administration dashboard
-* CRUD management for services, projects, posts, categories, media, testimonials, client logos, consultations, and settings
-* Media upload and management
-* API-based data synchronization with Laravel
-* Permanent hard-delete workflow
 
-## Architecture
-
-```text
-React Frontend
-      ↓
-Axios / REST API
-      ↓
-Laravel Backend
-      ↓
-MySQL
-```
-
-The Laravel backend acts as the authoritative source of application data, while React provides the user interface and administrative experience.
-
-## Project Structure
-
-```text
-src/
-├── api/          # Laravel API clients
-├── components/   # Website and Admin UI
-├── context/      # Authentication, data, and language state
-├── lib/          # Permissions and shared logic
-├── pages/        # Application pages
-├── assets/       # Static assets
-└── utils/        # Utility functions
-```
-
-## Development
-
-```bash
-npm install
-npm run dev
-```
-
-Configure the backend API:
-
-```env
-VITE_API_URL=http://127.0.0.1:8000/api
-```
-
-Build the application:
-
-```bash
-npm run build
-```
-
-**Status:** Active development and progressive integration with the MasterLink Laravel backend.
+1. Install dependencies:
+   `npm install`
+2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
+3. Run the app:
+   `npm run dev`

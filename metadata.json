@@ -1,0 +1,6 @@
+{
+  "name": "Master Link",
+  "description": "Premium marketing and technology agency website.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
