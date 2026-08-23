@@ -45,7 +45,7 @@ export function TestimonialsSection() {
         {activeTestimonials.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
             {activeTestimonials.map((testimonial, idx) => {
-              const imageUrl = testimonial.media?.file_path;
+              const imageUrl = testimonial.media?.url || testimonial.media?.file_path;
               const displayName = (isRtl && testimonial.display_name_ar) ? testimonial.display_name_ar : testimonial.display_name;
               const message = (isRtl && testimonial.message_ar) ? testimonial.message_ar : testimonial.message;
 

@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { useData } from '../context/DataContext';
-import { DEFAULT_CLIENT_LOGOS } from '../data';
 import { ClientLogo } from '../types';
 import { ShieldCheck, Sparkles, ArrowUpRight, ArrowUpLeft, ChevronDown } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
@@ -18,8 +17,8 @@ function LogoCard({ logo, index, isRtl, mediaItems }: LogoCardProps) {
   const [imgError, setImgError] = useState(false);
 
   // Resolve image URL from logo.media, mediaItems, or direct media_id
-  const matchedMedia = (mediaItems || []).find((m: any) => m.id === logo.media_id || m.id === logo.media?.id);
-  const rawImage = logo.media?.file_path || matchedMedia?.url || (typeof logo.media_id === 'string' && (logo.media_id.startsWith('http') || logo.media_id.startsWith('data:') || logo.media_id.startsWith('/')) ? logo.media_id : null);
+  const matchedMedia = (mediaItems || []).find((m: any) => m.id === logo.media_id || m.id === (logo.media as any)?.id);
+  const rawImage = (logo.media as any)?.url || (logo.media as any)?.file_path || matchedMedia?.url || (typeof logo.media_id === 'string' && (logo.media_id.startsWith('http') || logo.media_id.startsWith('data:') || logo.media_id.startsWith('/')) ? logo.media_id : null);
   
   const logoImage = typeof rawImage === 'string' ? rawImage : null;
 
@@ -103,12 +102,10 @@ export function ClientLogosSection() {
   const { clientLogos, mediaItems } = useData();
   const [showAll, setShowAll] = useState(false);
 
-  // Filter active, non-deleted logos and sort by sort_order
-  const filteredLogos: ClientLogo[] = (clientLogos || [])
-    .filter(logo => logo.is_active && !logo.deleted_at)
-    .sort((a, b) => a.sort_order - b.sort_order);
-
-  const activeLogos = filteredLogos.length > 0 ? filteredLogos : DEFAULT_CLIENT_LOGOS;
+  // Filter active logos and sort by sort_order
+  const activeLogos: ClientLogo[] = (clientLogos || [])
+    .filter(logo => Boolean(logo.is_active))
+    .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0));
 
   // Show at least 4 logos initially
   const INITIAL_COUNT = 4;

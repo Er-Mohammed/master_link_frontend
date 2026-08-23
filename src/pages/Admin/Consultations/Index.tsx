@@ -29,7 +29,9 @@ import {
   ChevronRight,
   Send,
   AlertTriangle,
-  FileText
+  FileText,
+  Download,
+  FileSpreadsheet
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -41,6 +43,11 @@ export function Index() {
   const [consultations, setConsultations] = useState<LaravelConsultation[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Export Loading & Dropdown State
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
+  const [isExportingPdf, setIsExportingPdf] = useState(false);
+  const [isExportDropdownOpen, setIsExportDropdownOpen] = useState(false);
 
   // Filter & Search Params
   const [search, setSearch] = useState<string>('');
@@ -108,6 +115,74 @@ export function Index() {
   useEffect(() => {
     fetchConsultations();
   }, [fetchConsultations]);
+
+  // Export Excel Handler
+  const handleExportExcel = async () => {
+    setIsExportingExcel(true);
+    try {
+      const params: any = {};
+      if (search.trim()) params.search = search.trim();
+      if (statusFilter !== 'all') params.status = statusFilter;
+      if (sortField) params.sort = sortField;
+      if (sortDirection) params.direction = sortDirection;
+
+      const blob = await adminConsultationsApi.exportExcel(params);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `masterlink-consultations-${new Date().toISOString().slice(0, 10)}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      if (err?.status === 401) {
+        handle401Error();
+        return;
+      }
+      if (err?.status === 403) {
+        alert(isRtl ? 'ليس لديك صلاحية لتصدير الاستشارات.' : 'Unauthorized to export consultations.');
+        return;
+      }
+      alert(err?.message || (isRtl ? 'تعذر إنشاء ملف Excel للتصدير.' : 'Failed to export Excel file.'));
+    } finally {
+      setIsExportingExcel(false);
+    }
+  };
+
+  // Export PDF Handler
+  const handleExportPdf = async () => {
+    setIsExportingPdf(true);
+    try {
+      const params: any = {};
+      if (search.trim()) params.search = search.trim();
+      if (statusFilter !== 'all') params.status = statusFilter;
+      if (sortField) params.sort = sortField;
+      if (sortDirection) params.direction = sortDirection;
+
+      const blob = await adminConsultationsApi.exportPdf(params);
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `masterlink-consultations-${new Date().toISOString().slice(0, 10)}.pdf`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      if (err?.status === 401) {
+        handle401Error();
+        return;
+      }
+      if (err?.status === 403) {
+        alert(isRtl ? 'ليس لديك صلاحية لتصدير الاستشارات.' : 'Unauthorized to export consultations.');
+        return;
+      }
+      alert(err?.message || (isRtl ? 'تعذر إنشاء ملف PDF للتصدير.' : 'Failed to export PDF file.'));
+    } finally {
+      setIsExportingPdf(false);
+    }
+  };
 
   // Status Change Handler
   const handleUpdateStatus = async (consultationId: number, newStatus: LaravelConsultation['status']) => {
@@ -281,6 +356,65 @@ export function Index() {
           >
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
+
+          {/* Export Data Dropdown */}
+          {canPerform('consultations', 'view') && (
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setIsExportDropdownOpen(!isExportDropdownOpen)}
+                disabled={isExportingExcel || isExportingPdf}
+                className="bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-2xl px-4 py-2.5 flex items-center gap-2 transition-all cursor-pointer shadow-xs disabled:opacity-50"
+              >
+                {isExportingExcel || isExportingPdf ? (
+                  <Loader2 className="w-4 h-4 animate-spin text-[#F20530]" />
+                ) : (
+                  <Download className="w-4 h-4 text-[#F20530]" />
+                )}
+                <span>
+                  {isExportingExcel
+                    ? (isRtl ? 'جاري تجهيز Excel...' : 'Preparing Excel...')
+                    : isExportingPdf
+                    ? (isRtl ? 'جاري تجهيز PDF...' : 'Preparing PDF...')
+                    : (isRtl ? 'تصدير البيانات' : 'Export Data')}
+                </span>
+              </button>
+
+              {isExportDropdownOpen && (
+                <div
+                  className={`absolute top-full mt-2 w-48 bg-white border border-slate-200 rounded-2xl shadow-xl py-2 z-30 ${
+                    isRtl ? 'left-0' : 'right-0'
+                  }`}
+                >
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsExportDropdownOpen(false);
+                      handleExportExcel();
+                    }}
+                    disabled={isExportingExcel}
+                    className="w-full px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 transition-colors text-right"
+                  >
+                    <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+                    <span>{isRtl ? 'تصدير Excel (.xlsx)' : 'Export Excel (.xlsx)'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsExportDropdownOpen(false);
+                      handleExportPdf();
+                    }}
+                    disabled={isExportingPdf}
+                    className="w-full px-4 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 flex items-center gap-2.5 transition-colors text-right border-t border-slate-100"
+                  >
+                    <FileText className="w-4 h-4 text-[#F20530]" />
+                    <span>{isRtl ? 'تصدير PDF (.pdf)' : 'Export PDF (.pdf)'}</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
         </div>
       </div>

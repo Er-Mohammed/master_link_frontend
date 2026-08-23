@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { useData } from '../context/DataContext';
 import { 
   Plus, 
   Search, 
@@ -24,29 +25,54 @@ import {
   CheckSquare,
   Square,
   AlertTriangle,
-  FileCheck
+  FileCheck,
+  Loader2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-
-interface CategoryItem {
-  id: string;
-  nameEn: string;
-  nameAr: string;
-  slug: string;
-  projectsCount: number;
-  displayOrder: number;
-  status: 'active' | 'hidden';
-  createdAt: string;
-}
+import {
+  adminProjectCategoriesApi,
+  LaravelProjectCategoryPayload,
+  authApi
+} from '../services/api';
+import { ProjectCategory } from '../types';
 
 export function CategoriesManagement() {
   const { language, isRtl } = useLanguage();
   const { canPerform } = useAuth();
-  const [isLoading, setIsLoading] = useState(false);
+  const { refreshProjectCategories } = useData();
+
+  // API Data States
+  const [categories, setCategories] = useState<ProjectCategory[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [pageError, setPageError] = useState<string | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [validationErrors, setValidationErrors] = useState<Record<string, string[]> | null>(null);
+
+  // Filters & Sorting
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'hidden'>('all');
   const [sortBy, setSortBy] = useState<'order' | 'projects' | 'name' | 'date'>('order');
-  
+
+  // Bulk actions selection (numeric IDs)
+  const [selectedIds, setSelectedIds] = useState<number[]>([]);
+
+  // Modal controller
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [editorMode, setEditorMode] = useState<'create' | 'edit'>('create');
+  const [selectedCategory, setSelectedCategory] = useState<ProjectCategory | null>(null);
+
+  // Form Fields (Aligned with DB schema: name, slug, description, sort_order, is_active)
+  const [formName, setFormName] = useState('');
+  const [formSlug, setFormSlug] = useState('');
+  const [formDescription, setFormDescription] = useState('');
+  const [formSortOrder, setFormSortOrder] = useState<number>(0);
+  const [formIsActive, setFormIsActive] = useState<boolean>(true);
+  const [isManualSlug, setIsManualSlug] = useState(false);
+
+  // Delete confirmation modal state
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState<ProjectCategory | null>(null);
+
   // Toast notifications state
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'danger' | 'info' } | null>(null);
 
@@ -55,226 +81,213 @@ export function CategoriesManagement() {
     setTimeout(() => setToast(null), 3000);
   };
 
-  // Seed Categories
-  const [categories, setCategories] = useState<CategoryItem[]>([
-    {
-      id: 'CAT-01',
-      nameEn: 'Web Development',
-      nameAr: 'تطوير الويب المتكامل',
-      slug: 'web-development',
-      projectsCount: 12,
-      displayOrder: 1,
-      status: 'active',
-      createdAt: '2026-01-10',
-    },
-    {
-      id: 'CAT-02',
-      nameEn: 'Mobile Applications',
-      nameAr: 'تطبيقات الهواتف الذكية',
-      slug: 'mobile-apps',
-      projectsCount: 8,
-      displayOrder: 2,
-      status: 'active',
-      createdAt: '2026-02-15',
-    },
-    {
-      id: 'CAT-03',
-      nameEn: 'AI Solutions',
-      nameAr: 'حلول الذكاء الاصطناعي',
-      slug: 'ai-solutions',
-      projectsCount: 5,
-      displayOrder: 3,
-      status: 'active',
-      createdAt: '2026-03-20',
-    },
-    {
-      id: 'CAT-04',
-      nameEn: 'ERP Systems',
-      nameAr: 'أنظمة إدارة المؤسسات ERP',
-      slug: 'erp-systems',
-      projectsCount: 3,
-      displayOrder: 4,
-      status: 'hidden',
-      createdAt: '2026-04-05',
+  const handle401Error = () => {
+    authApi.clearToken();
+    window.location.hash = '#admin-login';
+  };
+
+  // Fetch categories directly from Laravel API
+  const fetchCategories = async () => {
+    setIsLoading(true);
+    setPageError(null);
+    try {
+      const res = await adminProjectCategoriesApi.getAll({
+        per_page: 100,
+        sort: 'sort_order',
+        direction: 'asc'
+      });
+      setCategories(res.data || []);
+    } catch (err: any) {
+      if (err?.status === 401) {
+        handle401Error();
+      } else if (err?.status === 403) {
+        setPageError('غير مصرح لك باستعراض تصنيفات المشاريع.');
+      } else {
+        setPageError(err?.message || 'تعذر جلب قائمة التصنيفات من خادم البيانات المباشر.');
+      }
+    } finally {
+      setIsLoading(false);
     }
-  ]);
+  };
 
-  // Bulk actions selection
-  const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [showBulkMenu, setShowBulkMenu] = useState(false);
+  useEffect(() => {
+    fetchCategories();
+  }, []);
 
-  // Modal controller
-  const [isEditorOpen, setIsEditorOpen] = useState(false);
-  const [editorMode, setEditorMode] = useState<'create' | 'edit'>('create');
-  const [selectedCategory, setSelectedCategory] = useState<CategoryItem | null>(null);
-
-  // Form Fields
-  const [formNameEn, setFormNameEn] = useState('');
-  const [formNameAr, setFormNameAr] = useState('');
-  const [formSlug, setFormSlug] = useState('');
-  const [formDisplayOrder, setFormDisplayOrder] = useState<number>(1);
-  const [formStatus, setFormStatus] = useState<'active' | 'hidden'>('active');
-  const [formProjectsCount, setFormProjectsCount] = useState<number>(0);
-
-  // Auto slug generation trigger
-  const [autoSlug, setAutoSlug] = useState(true);
-
-  // Delete confirmation
-  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
-  const [categoryToDelete, setCategoryToDelete] = useState<CategoryItem | null>(null);
-
-  // Active Dropdown Actions for specific rows (mainly for mobile view)
-  const [activeRowDropdown, setActiveRowDropdown] = useState<string | null>(null);
-
-  // Generate slug helper
+  // Slug auto-generation logic
   const generateSlug = (text: string) => {
     return text
       .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, '')
-      .replace(/\s+/g, '-')
-      .replace(/-+/g, '-');
+      .trim()
+      .replace(/[^a-z0-9\u0600-\u06FF]+/g, '-')
+      .replace(/(^-|-$)/g, '');
   };
 
-  // Sync English Name to Slug if autoSlug is active
   useEffect(() => {
-    if (autoSlug && editorMode === 'create') {
-      setFormSlug(generateSlug(formNameEn));
+    if (!isManualSlug && editorMode === 'create') {
+      setFormSlug(generateSlug(formName));
     }
-  }, [formNameEn, autoSlug, editorMode]);
-
-  // Reset/Trigger simulated loading
-  const handleSimulateLoad = () => {
-    setIsLoading(true);
-    setTimeout(() => {
-      setIsLoading(false);
-      triggerToast(language === 'en' ? 'Categories synchronized.' : 'تم مزامنة التصنيفات السحابية.', 'success');
-    }, 1000);
-  };
+  }, [formName, isManualSlug, editorMode]);
 
   // Open Editor Modal (Create Mode)
   const handleOpenCreateModal = () => {
     setEditorMode('create');
     setSelectedCategory(null);
-    setFormNameEn('');
-    setFormNameAr('');
+    setValidationErrors(null);
+    setFormName('');
     setFormSlug('');
-    setFormDisplayOrder(categories.length > 0 ? Math.max(...categories.map(c => c.displayOrder)) + 1 : 1);
-    setFormStatus('active');
-    setFormProjectsCount(0);
-    setAutoSlug(true);
+    setFormDescription('');
+    setFormSortOrder(categories.length > 0 ? Math.max(...categories.map(c => c.sort_order ?? 0)) + 1 : 1);
+    setFormIsActive(true);
+    setIsManualSlug(false);
     setIsEditorOpen(true);
   };
 
   // Open Editor Modal (Edit Mode)
-  const handleOpenEditModal = (cat: CategoryItem) => {
+  const handleOpenEditModal = (cat: ProjectCategory) => {
     setEditorMode('edit');
     setSelectedCategory(cat);
-    setFormNameEn(cat.nameEn);
-    setFormNameAr(cat.nameAr);
-    setFormSlug(cat.slug);
-    setFormDisplayOrder(cat.displayOrder);
-    setFormStatus(cat.status);
-    setFormProjectsCount(cat.projectsCount);
-    setAutoSlug(false);
+    setValidationErrors(null);
+    setFormName(cat.name || '');
+    setFormSlug(cat.slug || '');
+    setFormDescription(cat.description || '');
+    setFormSortOrder(cat.sort_order ?? 0);
+    setFormIsActive(Boolean(cat.is_active));
+    setIsManualSlug(true);
     setIsEditorOpen(true);
-    setActiveRowDropdown(null);
   };
 
-  // Toggle Visibility of category directly
-  const handleToggleVisibility = (cat: CategoryItem) => {
-    const nextStatus = cat.status === 'active' ? 'hidden' : 'active';
-    setCategories(prev => prev.map(item => item.id === cat.id ? { ...item, status: nextStatus } : item));
-    triggerToast(
-      language === 'en' 
-        ? `Category status is now ${nextStatus}` 
-        : `حالة التصنيف الآن: ${nextStatus === 'active' ? 'نشط' : 'مخفي'}`,
-      'info'
-    );
-  };
-
-  // Trigger Delete Confirmation
-  const handleConfirmDelete = (cat: CategoryItem) => {
-    setCategoryToDelete(cat);
-    setIsDeleteConfirmOpen(true);
-    setActiveRowDropdown(null);
-  };
-
-  // Execute Delete
-  const handleDeleteCategory = () => {
-    if (!categoryToDelete) return;
-    setCategories(prev => prev.filter(c => c.id !== categoryToDelete.id));
-    setSelectedIds(prev => prev.filter(id => id !== categoryToDelete.id));
-    setIsDeleteConfirmOpen(false);
-    triggerToast(
-      language === 'en' 
-        ? `Category "${categoryToDelete.nameEn}" successfully deleted.` 
-        : `تم حذف التصنيف "${categoryToDelete.nameAr}" بنجاح.`,
-      'danger'
-    );
-    setCategoryToDelete(null);
-  };
-
-  // Save Category Form (Submit)
-  const handleSaveForm = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formNameEn && !formNameAr) {
-      triggerToast(language === 'en' ? 'Category name is required.' : 'اسم التصنيف مطلوب.', 'danger');
+  // Toggle Category Visibility directly via API
+  const handleToggleVisibility = async (cat: ProjectCategory) => {
+    if (!canPerform('categories', 'edit')) {
+      triggerToast('ليس لديك صلاحية تعديل حالة التصنيف.', 'danger');
       return;
     }
 
-    const finalSlug = formSlug.trim() || generateSlug(formNameEn);
-
-    if (editorMode === 'create') {
-      const newCategory: CategoryItem = {
-        id: `CAT-0${Math.floor(10 + Math.random() * 90)}`,
-        nameEn: formNameEn,
-        nameAr: formNameAr,
-        slug: finalSlug,
-        projectsCount: formProjectsCount,
-        displayOrder: formDisplayOrder,
-        status: formStatus,
-        createdAt: new Date().toISOString().split('T')[0]
-      };
-      setCategories(prev => [...prev, newCategory]);
+    try {
+      const nextIsActive = !cat.is_active;
+      await adminProjectCategoriesApi.update(cat.id, { is_active: nextIsActive });
+      setCategories(prev => prev.map(item => item.id === cat.id ? { ...item, is_active: nextIsActive } : item));
+      refreshProjectCategories();
       triggerToast(
         language === 'en' 
-          ? `Category "${formNameEn}" successfully created.` 
-          : `تم إنشاء التصنيف "${formNameAr}" بنجاح.`,
-        'success'
+          ? `Category visibility updated to ${nextIsActive ? 'Active' : 'Hidden'}` 
+          : `حالة التصنيف الآن: ${nextIsActive ? 'نشط' : 'مخفي'}`,
+        'info'
       );
-    } else if (editorMode === 'edit' && selectedCategory) {
-      setCategories(prev => prev.map(item => 
-        item.id === selectedCategory.id 
-          ? { 
-              ...item, 
-              nameEn: formNameEn, 
-              nameAr: formNameAr, 
-              slug: finalSlug, 
-              displayOrder: formDisplayOrder, 
-              status: formStatus,
-              projectsCount: formProjectsCount
-            } 
-          : item
-      ));
-      triggerToast(
-        language === 'en' 
-          ? `Category "${formNameEn}" updated successfully.` 
-          : `تم تحديث التصنيف "${formNameAr}" بنجاح.`,
-        'success'
-      );
+    } catch (err: any) {
+      if (err?.status === 401) handle401Error();
+      else if (err?.status === 403) triggerToast('غير مصرح لك بتغيير حالة هذا التصنيف.', 'danger');
+      else triggerToast('تعذر تغيير حالة التصنيف عبر الخادم.', 'danger');
     }
-    setIsEditorOpen(false);
   };
 
-  // Handle selection of specific row
-  const handleSelectRow = (id: string) => {
+  // Confirm Delete
+  const handleConfirmDelete = (cat: ProjectCategory) => {
+    setCategoryToDelete(cat);
+    setIsDeleteConfirmOpen(true);
+  };
+
+  // Execute Delete via API
+  const handleDeleteCategory = async () => {
+    if (!categoryToDelete) return;
+    if (!canPerform('categories', 'delete')) {
+      triggerToast('ليس لديك صلاحية حذف التصنيفات.', 'danger');
+      setIsDeleteConfirmOpen(false);
+      return;
+    }
+
+    setActionLoading(true);
+    try {
+      await adminProjectCategoriesApi.delete(categoryToDelete.id);
+      setIsDeleteConfirmOpen(false);
+      triggerToast(
+        language === 'en' 
+          ? `Category "${categoryToDelete.name}" successfully deleted.` 
+          : `تم حذف التصنيف "${categoryToDelete.name}" بنجاح.`,
+        'danger'
+      );
+      setCategoryToDelete(null);
+      await fetchCategories();
+      refreshProjectCategories();
+    } catch (err: any) {
+      if (err?.status === 401) handle401Error();
+      else if (err?.status === 403) triggerToast('غير مصرح لك بحذف هذا التصنيف.', 'danger');
+      else triggerToast(err?.message || 'تعذر حذف التصنيف عبر الخادم.', 'danger');
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Save Category Form (Submit Create/Update to API)
+  const handleSaveForm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setValidationErrors(null);
+
+    if (!formName.trim()) {
+      setValidationErrors({ name: ['اسم التصنيف مطلوب.'] });
+      return;
+    }
+    if (!formSlug.trim()) {
+      setValidationErrors({ slug: ['معرف الرابط الفريد (Slug) مطلوب.'] });
+      return;
+    }
+
+    setActionLoading(true);
+
+    const payload: LaravelProjectCategoryPayload = {
+      name: formName.trim(),
+      slug: formSlug.trim(),
+      description: formDescription.trim() || null,
+      sort_order: Number(formSortOrder),
+      is_active: formIsActive
+    };
+
+    try {
+      if (editorMode === 'create') {
+        await adminProjectCategoriesApi.create(payload);
+        triggerToast(
+          language === 'en' 
+            ? `Category "${formName}" successfully created.` 
+            : `تم إنشاء التصنيف "${formName}" بنجاح في قاعدة البيانات.`,
+          'success'
+        );
+      } else if (editorMode === 'edit' && selectedCategory) {
+        await adminProjectCategoriesApi.update(selectedCategory.id, payload);
+        triggerToast(
+          language === 'en' 
+            ? `Category "${formName}" updated successfully.` 
+            : `تم تحديث التصنيف "${formName}" بنجاح.`,
+          'success'
+        );
+      }
+      setIsEditorOpen(false);
+      await fetchCategories();
+      refreshProjectCategories();
+    } catch (err: any) {
+      if (err?.status === 401) {
+        handle401Error();
+      } else if (err?.status === 403) {
+        triggerToast('غير مصرح لك بإجراء هذه العملية على التصنيفات (HTTP 403).', 'danger');
+      } else if (err?.status === 422 && err?.errors) {
+        setValidationErrors(err.errors);
+      } else {
+        triggerToast(err?.message || 'حدث خطأ أثناء حفظ التصنيف على الخادم.', 'danger');
+      }
+    } finally {
+      setActionLoading(false);
+    }
+  };
+
+  // Row selection for bulk actions
+  const handleSelectRow = (id: number) => {
     setSelectedIds(prev => 
       prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
     );
   };
 
-  // Handle bulk toggle select
-  const handleSelectAll = (filteredIds: string[]) => {
+  // Select all rows toggle
+  const handleSelectAll = (filteredIds: number[]) => {
     if (selectedIds.length === filteredIds.length) {
       setSelectedIds([]);
     } else {
@@ -282,75 +295,86 @@ export function CategoriesManagement() {
     }
   };
 
-  // Bulk Actions
-  const handleBulkAction = (action: 'active' | 'hidden' | 'delete') => {
+  // Bulk Actions via API
+  const handleBulkAction = async (action: 'active' | 'hidden' | 'delete') => {
     if (selectedIds.length === 0) return;
-    
-    if (action === 'delete') {
-      setCategories(prev => prev.filter(c => !selectedIds.includes(c.id)));
+    setActionLoading(true);
+
+    try {
+      if (action === 'delete') {
+        await Promise.all(selectedIds.map(id => adminProjectCategoriesApi.delete(id)));
+        triggerToast(
+          language === 'en' 
+            ? `Deleted ${selectedIds.length} categories.` 
+            : `تم حذف ${selectedIds.length} تصنيفات بنجاح من قاعدة البيانات.`,
+          'danger'
+        );
+      } else {
+        const nextIsActive = action === 'active';
+        await Promise.all(selectedIds.map(id => adminProjectCategoriesApi.update(id, { is_active: nextIsActive })));
+        triggerToast(
+          language === 'en' 
+            ? `Updated ${selectedIds.length} categories to ${action === 'active' ? 'active' : 'hidden'}.` 
+            : `تم تعديل حالة ${selectedIds.length} تصنيفات بنجاح.`,
+          'success'
+        );
+      }
       setSelectedIds([]);
-      triggerToast(
-        language === 'en' 
-          ? `Deleted ${selectedIds.length} categories.` 
-          : `تم حذف ${selectedIds.length} تصنيفات بنجاح.`,
-        'danger'
-      );
-    } else {
-      setCategories(prev => prev.map(c => 
-        selectedIds.includes(c.id) ? { ...c, status: action } : c
-      ));
-      triggerToast(
-        language === 'en' 
-          ? `Updated ${selectedIds.length} categories to ${action === 'active' ? 'active' : 'hidden'}.` 
-          : `تم تعديل حالة ${selectedIds.length} تصنيفات بنجاح.`,
-        'success'
-      );
+      await fetchCategories();
+      refreshProjectCategories();
+    } catch (err: any) {
+      if (err?.status === 401) handle401Error();
+      else triggerToast('حدث خطأ أثناء تطبيق الإجراء الجماعي عبر الخادم.', 'danger');
+    } finally {
+      setActionLoading(false);
     }
-    setShowBulkMenu(false);
   };
 
-  // Statistics computation
+  // Computed Stats directly from DB payload
   const totalCategories = categories.length;
-  const activeCategories = categories.filter(c => c.status === 'active').length;
-  const hiddenCategories = categories.filter(c => c.status === 'hidden').length;
+  const activeCategories = categories.filter(c => c.is_active).length;
+  const hiddenCategories = categories.filter(c => !c.is_active).length;
 
-  // Filter & Sort computation
+  // Filter & Sort Categories
   const filteredCategories = categories.filter(c => {
     const matchesSearch = 
-      c.nameEn.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.nameAr.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      c.slug.toLowerCase().includes(searchQuery.toLowerCase());
+      (c.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (c.slug || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (c.description || '').toLowerCase().includes(searchQuery.toLowerCase());
       
-    const matchesStatus = statusFilter === 'all' || c.status === statusFilter;
+    const matchesStatus = 
+      statusFilter === 'all' || 
+      (statusFilter === 'active' && c.is_active) || 
+      (statusFilter === 'hidden' && !c.is_active);
     
     return matchesSearch && matchesStatus;
   }).sort((a, b) => {
     if (sortBy === 'order') {
-      return a.displayOrder - b.displayOrder;
+      return (a.sort_order ?? 0) - (b.sort_order ?? 0);
     }
     if (sortBy === 'projects') {
-      return b.projectsCount - a.projectsCount;
+      return (b.projects_count ?? 0) - (a.projects_count ?? 0);
     }
     if (sortBy === 'name') {
-      return isRtl ? a.nameAr.localeCompare(b.nameAr) : a.nameEn.localeCompare(b.nameEn);
+      return (a.name || '').localeCompare(b.name || '');
     }
     if (sortBy === 'date') {
-      return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
     }
     return 0;
   });
 
-  // Localized string dictionary
+  // Localized Labels
   const dictionary = {
     title: language === 'en' ? 'Portfolio Categories' : 'تصنيفات معرض الأعمال',
     subtitle: language === 'en' 
-      ? 'Manage and coordinate portfolio filter taxonomies such as Web Development, Mobile Applications, AI, and ERP tiers.'
-      : 'إدارة وتنسيق تصنيفات معرض الأعمال وفهرستها مثل تطوير الويب، تطبيقات الهواتف، الذكاء الاصطناعي، والحلول المؤسسية.',
+      ? 'Manage and coordinate live portfolio taxonomy categories connected directly to MySQL.'
+      : 'إدارة وتنسيق تصنيفات معرض الأعمال وفهرستها المباشرة المتصلة بقاعدة البيانات.',
     statTotal: language === 'en' ? 'Total Categories' : 'إجمالي التصنيفات',
     statActive: language === 'en' ? 'Active Categories' : 'التصنيفات النشطة',
     statHidden: language === 'en' ? 'Hidden Categories' : 'التصنيفات المخفية',
     actionAdd: language === 'en' ? 'Add New Category' : 'إضافة تصنيف جديد',
-    placeholderSearch: language === 'en' ? 'Search by category name or slug...' : 'ابحث باسم التصنيف أو المعرف البديل (الslug)...',
+    placeholderSearch: language === 'en' ? 'Search by category name, slug or description...' : 'ابحث باسم التصنيف أو المعرف البديل (الslug) أو الوصف...',
     filterAll: language === 'en' ? 'All Statuses' : 'جميع الحالات',
     filterActive: language === 'en' ? 'Active Only' : 'النشطة فقط',
     filterHidden: language === 'en' ? 'Hidden Only' : 'المخفية فقط',
@@ -378,24 +402,20 @@ export function CategoriesManagement() {
     labelHidden: language === 'en' ? 'Hidden' : 'مخفي',
     modalAddTitle: language === 'en' ? 'Add New Portfolio Category' : 'إنشاء تصنيف جديد لمعرض الأعمال',
     modalEditTitle: language === 'en' ? 'Edit Category Details' : 'تعديل بيانات التصنيف الرقمي',
-    labelNameEn: language === 'en' ? 'Category Name (English)' : 'اسم التصنيف (بالإلكترونية/الإنجليزية)',
-    labelNameAr: language === 'en' ? 'Category Name (Arabic)' : 'اسم التصنيف (بالعربية)',
+    labelName: language === 'en' ? 'Category Name' : 'اسم التصنيف',
     labelSlug: language === 'en' ? 'Custom URL Slug' : 'معرف الرابط الفريد (Slug)',
-    labelSlugAuto: language === 'en' ? 'Auto-generate from English name' : 'توليد تلقائي من الاسم الإنجليزي',
-    labelDisplayOrder: language === 'en' ? 'Display Sorting Order' : 'أولوية وترتيب العرض الفهرسي',
-    labelStatus: language === 'en' ? 'Initial Visibility Status' : 'حالة الظهور الأولية',
-    labelProjectsCount: language === 'en' ? 'Associated Projects Count' : 'عدد المشاريع المرتبطة (محاكاة)',
+    labelSlugAuto: language === 'en' ? 'Auto-generate slug' : 'توليد تلقائي للمعرف',
+    labelDescription: language === 'en' ? 'Description' : 'وصف التصنيف',
+    labelDisplayOrder: language === 'en' ? 'Display Sorting Order' : 'ترتيب العرض',
+    labelStatus: language === 'en' ? 'Visibility Status' : 'حالة الظهور',
     btnCancel: language === 'en' ? 'Cancel' : 'إلغاء الأمر',
-    btnConfirmSave: language === 'en' ? 'Save Category' : 'حفظ التصنيف وحياكته',
+    btnConfirmSave: language === 'en' ? 'Save Category' : 'حفظ التصنيف',
     deleteConfirmTitle: language === 'en' ? 'Delete Portfolio Category' : 'حذف تصنيف معرض الأعمال',
     deleteConfirmDesc: language === 'en' 
-      ? 'Are you absolutely sure you want to delete this category? This action is irreversible and may affect how projects assigned to this category are filtered on the client website.'
-      : 'هل أنت متأكد تماماً من رغبتك في حذف هذا التصنيف؟ هذا الإجراء غير قابل للتراجع وقد يؤثر على تصفية وفرز المشاريع الرقمية المرتبطة به في موقع الوكالة.',
+      ? 'Are you sure you want to delete this category permanently from MySQL? This action cannot be undone.'
+      : 'هل أنت متأكد تماماً من رغبتك في حذف هذا التصنيف نهائياً من قاعدة البيانات؟ هذا الإجراء غير قابل للتراجع.',
     btnDelete: language === 'en' ? 'Delete Category' : 'تأكيد الحذف النهائي',
-    btnSimulateLoading: language === 'en' ? 'Simulate Live Sync' : 'محاكاة التزامن الحي',
-    viewCategoryDetails: language === 'en' ? 'View Details' : 'عرض التفاصيل',
-    quickActionHide: language === 'en' ? 'Hide Category' : 'إخفاء التصنيف',
-    quickActionShow: language === 'en' ? 'Activate Category' : 'تفعيل وتنشيط'
+    btnRefresh: language === 'en' ? 'Refresh Data' : 'تحديث البيانات'
   };
 
   return (
@@ -414,7 +434,7 @@ export function CategoriesManagement() {
             {toast.type === 'danger' ? (
               <AlertCircle className="w-4 h-4 text-[#F20530] shrink-0" />
             ) : (
-              <Check className="w-4 h-4 text-[#F20530] shrink-0" />
+              <Check className="w-4 h-4 text-emerald-400 shrink-0" />
             )}
             <span className="text-xs font-semibold leading-relaxed">{toast.message}</span>
           </motion.div>
@@ -438,13 +458,15 @@ export function CategoriesManagement() {
           
           <div className={`flex flex-wrap items-center gap-2.5 ${isRtl ? 'flex-row-reverse' : ''}`}>
             <button
-              onClick={handleSimulateLoad}
+              onClick={fetchCategories}
+              disabled={isLoading}
               className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-600 hover:text-slate-900 hover:bg-slate-50 border border-slate-200 transition-all cursor-pointer"
-              id="btn-simulate-sync"
+              id="btn-refresh-categories"
             >
               <RefreshCw className={`w-3.5 h-3.5 text-[#F20530] ${isLoading ? 'animate-spin' : ''}`} />
-              <span>{dictionary.btnSimulateLoading}</span>
+              <span>{dictionary.btnRefresh}</span>
             </button>
+
             {canPerform('categories', 'create') && (
               <button
                 onClick={handleOpenCreateModal}
@@ -458,7 +480,7 @@ export function CategoriesManagement() {
           </div>
         </div>
 
-        {/* Title and Description Texts under the button */}
+        {/* Title and Description */}
         <div className={`space-y-1 ${isRtl ? 'text-right' : 'text-left'}`}>
           <h2 className="text-2xl font-extrabold text-slate-900 tracking-tight leading-none">
             {dictionary.title}
@@ -468,6 +490,22 @@ export function CategoriesManagement() {
           </p>
         </div>
       </div>
+
+      {/* Page Error Banner */}
+      {pageError && (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-2xl flex items-center justify-between gap-3 text-red-700 text-xs font-bold">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+            <span>{pageError}</span>
+          </div>
+          <button
+            onClick={fetchCategories}
+            className="px-3 py-1 bg-red-100 hover:bg-red-200 text-red-800 rounded-lg transition-colors cursor-pointer"
+          >
+            إعادة المحاولة
+          </button>
+        </div>
+      )}
 
       {/* STATISTICS GRID */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-5">
@@ -578,14 +616,16 @@ export function CategoriesManagement() {
                   <>
                     <button
                       onClick={() => handleBulkAction('active')}
-                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-extrabold rounded-lg transition-all cursor-pointer"
+                      disabled={actionLoading}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-extrabold rounded-lg transition-all cursor-pointer disabled:opacity-50"
                       id="bulk-activate-btn"
                     >
                       {dictionary.bulkActive}
                     </button>
                     <button
                       onClick={() => handleBulkAction('hidden')}
-                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-[11px] font-extrabold rounded-lg transition-all cursor-pointer"
+                      disabled={actionLoading}
+                      className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-white text-[11px] font-extrabold rounded-lg transition-all cursor-pointer disabled:opacity-50"
                       id="bulk-hide-btn"
                     >
                       {dictionary.bulkHide}
@@ -595,7 +635,8 @@ export function CategoriesManagement() {
                 {canPerform('categories', 'delete') && (
                   <button
                     onClick={() => handleBulkAction('delete')}
-                    className="px-3 py-1.5 bg-[#F20530] hover:bg-rose-600 text-white text-[11px] font-extrabold rounded-lg transition-all cursor-pointer flex items-center gap-1"
+                    disabled={actionLoading}
+                    className="px-3 py-1.5 bg-[#F20530] hover:bg-rose-600 text-white text-[11px] font-extrabold rounded-lg transition-all cursor-pointer flex items-center gap-1 disabled:opacity-50"
                     id="bulk-delete-btn"
                   >
                     <Trash2 className="w-3 h-3" />
@@ -615,7 +656,7 @@ export function CategoriesManagement() {
         )}
       </AnimatePresence>
 
-      {/* CORE CATEGORIES GRID / TABLE */}
+      {/* CORE CATEGORIES TABLE */}
       <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-sm">
         
         {isLoading ? (
@@ -672,7 +713,7 @@ export function CategoriesManagement() {
                   <th className="py-4 px-5 w-12 text-center">
                     <button
                       onClick={() => handleSelectAll(filteredCategories.map(c => c.id))}
-                      className="p-1 hover:bg-slate-200 rounded-md transition-colors inline-block"
+                      className="p-1 hover:bg-slate-200 rounded-md transition-colors inline-block cursor-pointer"
                     >
                       {selectedIds.length === filteredCategories.length ? (
                         <CheckSquare className="w-4 h-4 text-[#F20530]" />
@@ -691,7 +732,7 @@ export function CategoriesManagement() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {filteredCategories.map((cat, idx) => {
+                {filteredCategories.map((cat) => {
                   const isSelected = selectedIds.includes(cat.id);
                   return (
                     <tr 
@@ -705,7 +746,7 @@ export function CategoriesManagement() {
                       <td className="py-3.5 px-5 text-center">
                         <button
                           onClick={() => handleSelectRow(cat.id)}
-                          className="p-1 rounded-md transition-colors inline-block"
+                          className="p-1 rounded-md transition-colors inline-block cursor-pointer"
                         >
                           {isSelected ? (
                             <CheckSquare className="w-4 h-4 text-[#F20530]" />
@@ -715,15 +756,17 @@ export function CategoriesManagement() {
                         </button>
                       </td>
 
-                      {/* Category Name & Bilingual Label */}
+                      {/* Category Name & Description */}
                       <td className="py-3.5 px-4 font-bold text-slate-900">
                         <div className="space-y-0.5">
                           <p className="text-xs font-extrabold text-slate-900">
-                            {language === 'en' ? cat.nameEn : cat.nameAr}
+                            {cat.name}
                           </p>
-                          <p className="text-[10px] text-slate-400 font-semibold font-sans">
-                            {language === 'en' ? cat.nameAr : cat.nameEn}
-                          </p>
+                          {cat.description && (
+                            <p className="text-[10px] text-slate-400 font-semibold truncate max-w-xs">
+                              {cat.description}
+                            </p>
+                          )}
                         </div>
                       </td>
 
@@ -735,14 +778,14 @@ export function CategoriesManagement() {
                       {/* Projects count */}
                       <td className="py-3.5 px-4 text-center">
                         <span className="px-2.5 py-1 rounded-lg bg-slate-50 text-slate-800 text-[10px] font-bold border border-slate-100 font-mono">
-                          {cat.projectsCount}
+                          {cat.projects_count ?? 0}
                         </span>
                       </td>
 
                       {/* Display sorting order */}
                       <td className="py-3.5 px-4 text-center">
                         <span className="font-mono text-xs font-bold text-slate-700 bg-slate-100/50 px-2 py-0.5 rounded-md">
-                          #{cat.displayOrder}
+                          #{cat.sort_order}
                         </span>
                       </td>
 
@@ -753,26 +796,25 @@ export function CategoriesManagement() {
                             <button
                               onClick={() => handleToggleVisibility(cat)}
                               className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer flex items-center gap-1 ${
-                                cat.status === 'active'
+                                cat.is_active
                                   ? 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 border border-emerald-100'
                                   : 'bg-slate-50 text-slate-500 hover:bg-slate-100 border border-slate-200'
                               }`}
-                              title={cat.status === 'active' ? dictionary.quickActionHide : dictionary.quickActionShow}
                               id={`status-toggle-${cat.id}`}
                             >
-                              <span className={`w-1.5 h-1.5 rounded-full ${cat.status === 'active' ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                              <span>{cat.status === 'active' ? dictionary.labelActive : dictionary.labelHidden}</span>
+                              <span className={`w-1.5 h-1.5 rounded-full ${cat.is_active ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                              <span>{cat.is_active ? dictionary.labelActive : dictionary.labelHidden}</span>
                             </button>
                           ) : (
                             <div
                               className={`px-2.5 py-1 rounded-md text-[10px] font-bold flex items-center gap-1 ${
-                                cat.status === 'active'
+                                cat.is_active
                                   ? 'bg-emerald-50 text-emerald-800 border border-emerald-100'
                                   : 'bg-slate-50 text-slate-500 border border-slate-200'
                               }`}
                             >
-                              <span className={`w-1.5 h-1.5 rounded-full ${cat.status === 'active' ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                              <span>{cat.status === 'active' ? dictionary.labelActive : dictionary.labelHidden}</span>
+                              <span className={`w-1.5 h-1.5 rounded-full ${cat.is_active ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                              <span>{cat.is_active ? dictionary.labelActive : dictionary.labelHidden}</span>
                             </div>
                           )}
                         </div>
@@ -782,50 +824,36 @@ export function CategoriesManagement() {
                       <td className="py-3.5 px-4 font-mono text-slate-400 text-[10px]">
                         <div className="flex items-center gap-1.5">
                           <Calendar className="w-3.5 h-3.5 text-slate-300" />
-                          <span>{cat.createdAt}</span>
+                          <span>{cat.created_at ? new Date(cat.created_at).toLocaleDateString(isRtl ? 'ar-SA' : 'en-US') : '-'}</span>
                         </div>
                       </td>
 
-                      {/* Core Row Actions */}
+                      {/* Row Actions */}
                       <td className="py-3.5 px-5 text-center">
                         <div className="flex items-center justify-center gap-1.5">
-                          <button
-                            onClick={() => {
-                              triggerToast(
-                                language === 'en' 
-                                  ? `Viewing category: ${cat.nameEn}` 
-                                  : `عرض تفاصيل تصنيف: ${cat.nameAr}`,
-                                'info'
-                              );
-                            }}
-                            className="p-1.5 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 text-slate-400 hover:text-slate-700 rounded-lg transition-all cursor-pointer"
-                            title={dictionary.viewCategoryDetails}
-                            id={`btn-view-${cat.id}`}
-                          >
-                            <Eye className="w-3.5 h-3.5" />
-                          </button>
                           {canPerform('categories', 'edit') && (
                             <button
                               onClick={() => handleOpenEditModal(cat)}
-                              className="p-1.5 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 text-slate-400 hover:text-blue-600 rounded-lg transition-all cursor-pointer"
+                              className="p-1.5 text-slate-400 hover:text-slate-900 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
                               title={language === 'en' ? 'Edit Category' : 'تعديل التصنيف'}
-                              id={`btn-edit-${cat.id}`}
+                              id={`edit-category-${cat.id}`}
                             >
-                              <Edit className="w-3.5 h-3.5" />
+                              <Edit className="w-4 h-4" />
                             </button>
                           )}
                           {canPerform('categories', 'delete') && (
                             <button
                               onClick={() => handleConfirmDelete(cat)}
-                              className="p-1.5 hover:bg-slate-50 border border-slate-200 hover:border-slate-300 text-slate-400 hover:text-[#F20530] rounded-lg transition-all cursor-pointer"
+                              className="p-1.5 text-slate-400 hover:text-[#F20530] hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                               title={language === 'en' ? 'Delete Category' : 'حذف التصنيف'}
-                              id={`btn-delete-${cat.id}`}
+                              id={`delete-category-${cat.id}`}
                             >
-                              <Trash2 className="w-3.5 h-3.5" />
+                              <Trash2 className="w-4 h-4" />
                             </button>
                           )}
                         </div>
                       </td>
+
                     </tr>
                   );
                 })}
@@ -833,10 +861,9 @@ export function CategoriesManagement() {
             </table>
           </div>
         )}
-
       </div>
 
-      {/* EDIT/CREATE CREATIVE MODAL DIALOG */}
+      {/* CREATE / EDIT MODAL DIALOG */}
       <AnimatePresence>
         {isEditorOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -859,7 +886,7 @@ export function CategoriesManagement() {
               id="category-editor-modal"
             >
               
-              {/* Modal Title and close */}
+              {/* Modal Header */}
               <div className={`flex items-center justify-between border-b border-slate-100 pb-4 ${isRtl ? 'flex-row-reverse' : ''}`}>
                 <div className={`flex items-center gap-2.5 ${isRtl ? 'flex-row-reverse' : ''}`}>
                   <div className="w-8 h-8 rounded-lg bg-rose-50 text-[#F20530] flex items-center justify-center shrink-0">
@@ -877,23 +904,38 @@ export function CategoriesManagement() {
                 </button>
               </div>
 
+              {/* 422 Validation Error Banner */}
+              {validationErrors && (
+                <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-right space-y-1.5">
+                  <div className="flex items-center gap-2 text-red-700 text-xs font-black">
+                    <AlertCircle className="w-4 h-4 shrink-0 text-red-600" />
+                    <span>تنبيه: يرجى تصحيح الأخطاء التالية:</span>
+                  </div>
+                  <ul className="list-disc list-inside text-xs font-bold text-red-600 pr-2 space-y-1">
+                    {Object.entries(validationErrors).flatMap(([field, msgs]) =>
+                      Array.isArray(msgs)
+                        ? msgs.map((m, i) => <li key={`${field}-${i}`}>{m}</li>)
+                        : [<li key={field}>{String(msgs)}</li>]
+                    )}
+                  </ul>
+                </div>
+              )}
+
               {/* Form Input fields */}
               <form onSubmit={handleSaveForm} className="space-y-4">
                 
-                {/* Category Name (Unified Single Input) */}
+                {/* Category Name */}
                 <div className="space-y-1.5">
                   <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                    {language === 'en' ? 'Category Name' : 'اسم التصنيف'} <span className="text-[#F20530]">*</span>
+                    {dictionary.labelName} <span className="text-[#F20530]">*</span>
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder={language === 'en' ? 'e.g. Web Development / تطوير الويب' : 'مثال: تطوير الويب المتكامل'}
-                    value={formNameEn || formNameAr}
-                    onChange={(e) => {
-                      setFormNameEn(e.target.value);
-                      setFormNameAr(e.target.value);
-                    }}
+                    maxLength={150}
+                    placeholder="مثال: تطوير الويب المتكامل"
+                    value={formName}
+                    onChange={(e) => setFormName(e.target.value)}
                     className={`block w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:bg-white focus:border-[#F20530] focus:ring-4 focus:ring-[#F20530]/5 transition-all ${
                       isRtl ? 'text-right' : 'text-left'
                     }`}
@@ -911,13 +953,18 @@ export function CategoriesManagement() {
                     {editorMode === 'create' && (
                       <button
                         type="button"
-                        onClick={() => setAutoSlug(!autoSlug)}
-                        className={`flex items-center gap-1.5 text-[10px] font-bold text-slate-500 hover:text-[#F20530] transition-colors ${isRtl ? 'flex-row-reverse' : ''}`}
+                        onClick={() => {
+                          setIsManualSlug(!isManualSlug);
+                          if (isManualSlug) {
+                            setFormSlug(generateSlug(formName));
+                          }
+                        }}
+                        className={`flex items-center gap-1.5 text-[10px] font-bold text-slate-500 hover:text-[#F20530] transition-colors cursor-pointer ${isRtl ? 'flex-row-reverse' : ''}`}
                       >
                         <span className={`w-4 h-4 border rounded flex items-center justify-center transition-all ${
-                          autoSlug ? 'bg-[#F20530] border-transparent text-white' : 'border-slate-300 bg-white'
+                          !isManualSlug ? 'bg-[#F20530] border-transparent text-white' : 'border-slate-300 bg-white'
                         }`}>
-                          {autoSlug && <Check className="w-3 h-3" />}
+                          {!isManualSlug && <Check className="w-3 h-3" />}
                         </span>
                         <span>{dictionary.labelSlugAuto}</span>
                       </button>
@@ -925,27 +972,42 @@ export function CategoriesManagement() {
                   </div>
                   
                   <div className="relative mt-2">
-                    <span className="hidden sm:flex absolute inset-y-0 left-3.5 items-center text-slate-400 font-mono text-[11px] pointer-events-none">
-                      masterlink.com/portfolio/category/
-                    </span>
-                    <span className="flex sm:hidden absolute inset-y-0 left-3.5 items-center text-slate-400 font-mono text-[11px] pointer-events-none">
-                      /category/
-                    </span>
                     <input
                       type="text"
                       required
+                      maxLength={180}
                       placeholder="web-development"
-                      disabled={autoSlug && editorMode === 'create'}
                       value={formSlug}
-                      onChange={(e) => setFormSlug(generateSlug(e.target.value))}
-                      className="block w-full pl-[85px] sm:pl-[215px] pr-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold outline-none focus:border-[#F20530] focus:ring-4 focus:ring-[#F20530]/5 disabled:opacity-60 disabled:bg-slate-100 transition-all text-left"
+                      onChange={(e) => {
+                        setFormSlug(generateSlug(e.target.value));
+                        setIsManualSlug(true);
+                      }}
+                      className="block w-full px-4 py-3 bg-white border border-slate-200 rounded-xl text-xs font-mono font-bold outline-none focus:border-[#F20530] focus:ring-4 focus:ring-[#F20530]/5 transition-all text-left"
+                      dir="ltr"
                       id="input-slug"
                     />
                   </div>
                 </div>
 
-                {/* Sorting and Initial count / Status layout */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Category Description */}
+                <div className="space-y-1.5">
+                  <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                    {dictionary.labelDescription}
+                  </label>
+                  <textarea
+                    rows={3}
+                    placeholder="أدخل وصفاً توضيحياً قصيراً لتصنيف المشاريع..."
+                    value={formDescription}
+                    onChange={(e) => setFormDescription(e.target.value)}
+                    className={`block w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:bg-white focus:border-[#F20530] transition-all ${
+                      isRtl ? 'text-right' : 'text-left'
+                    }`}
+                    id="input-description"
+                  />
+                </div>
+
+                {/* Sorting and Status Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   
                   {/* Sorting Display Order */}
                   <div className="space-y-1.5">
@@ -954,37 +1016,22 @@ export function CategoriesManagement() {
                     </label>
                     <input
                       type="number"
-                      min={1}
-                      value={formDisplayOrder}
-                      onChange={(e) => setFormDisplayOrder(parseInt(e.target.value) || 1)}
-                      className="block w-full px-3.5 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold outline-none focus:bg-white focus:border-[#F20530] transition-all text-center"
-                      id="input-display-order"
-                    />
-                  </div>
-
-                  {/* Projects Count (Simulated) */}
-                  <div className="space-y-1.5">
-                    <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                      {dictionary.labelProjectsCount}
-                    </label>
-                    <input
-                      type="number"
                       min={0}
-                      value={formProjectsCount}
-                      onChange={(e) => setFormProjectsCount(parseInt(e.target.value) || 0)}
+                      value={formSortOrder}
+                      onChange={(e) => setFormSortOrder(parseInt(e.target.value) || 0)}
                       className="block w-full px-3.5 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-mono font-bold outline-none focus:bg-white focus:border-[#F20530] transition-all text-center"
-                      id="input-projects-count"
+                      id="input-sort-order"
                     />
                   </div>
 
-                  {/* Initial visibility status */}
+                  {/* Visibility Status */}
                   <div className="space-y-1.5">
                     <label className="block text-[10px] font-bold text-slate-500 uppercase tracking-wider">
                       {dictionary.labelStatus}
                     </label>
                     <select
-                      value={formStatus}
-                      onChange={(e) => setFormStatus(e.target.value as any)}
+                      value={formIsActive ? 'active' : 'hidden'}
+                      onChange={(e) => setFormIsActive(e.target.value === 'active')}
                       className="block w-full px-3.5 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs font-bold outline-none focus:bg-white focus:border-[#F20530] transition-all cursor-pointer text-center"
                       id="input-status-select"
                     >
@@ -995,7 +1042,7 @@ export function CategoriesManagement() {
 
                 </div>
 
-                {/* Buttons Cancel/Confirm */}
+                {/* Form Action Buttons */}
                 <div className={`flex items-center justify-end gap-3 pt-4 border-t border-slate-100 ${isRtl ? 'flex-row-reverse' : ''}`}>
                   <button
                     type="button"
@@ -1006,10 +1053,11 @@ export function CategoriesManagement() {
                   </button>
                   <button
                     type="submit"
-                    className="px-5 py-2.5 bg-[#F20530] hover:bg-rose-600 text-white rounded-xl text-xs font-extrabold transition-all cursor-pointer shadow-lg shadow-rose-100 flex items-center gap-2"
+                    disabled={actionLoading}
+                    className="px-5 py-2.5 bg-[#F20530] hover:bg-rose-600 text-white rounded-xl text-xs font-extrabold transition-all cursor-pointer shadow-lg shadow-rose-100 flex items-center gap-2 disabled:opacity-50"
                     id="btn-save-category-submit"
                   >
-                    <FileCheck className="w-4 h-4" />
+                    {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <FileCheck className="w-4 h-4" />}
                     <span>{dictionary.btnConfirmSave}</span>
                   </button>
                 </div>
@@ -1052,7 +1100,7 @@ export function CategoriesManagement() {
                   {dictionary.deleteConfirmTitle}
                 </h3>
                 <p className="text-slate-800 text-xs font-extrabold">
-                  {isRtl ? categoryToDelete.nameAr : categoryToDelete.nameEn} (/{categoryToDelete.slug})
+                  {categoryToDelete.name} (/{categoryToDelete.slug})
                 </p>
                 <p className="text-slate-400 text-xs leading-relaxed font-semibold">
                   {dictionary.deleteConfirmDesc}
@@ -1070,10 +1118,12 @@ export function CategoriesManagement() {
                 <button
                   type="button"
                   onClick={handleDeleteCategory}
-                  className="flex-1 py-2.5 bg-[#F20530] hover:bg-rose-600 text-white rounded-xl text-xs font-extrabold transition-all cursor-pointer shadow-lg shadow-rose-100"
+                  disabled={actionLoading}
+                  className="flex-1 py-2.5 bg-[#F20530] hover:bg-rose-600 text-white rounded-xl text-xs font-extrabold transition-all cursor-pointer shadow-lg shadow-rose-100 flex items-center justify-center gap-2 disabled:opacity-50"
                   id="confirm-delete-action-btn"
                 >
-                  {dictionary.btnDelete}
+                  {actionLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                  <span>{dictionary.btnDelete}</span>
                 </button>
               </div>
             </motion.div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { useData } from '../context/DataContext';
 import { 
   adminClientLogosApi, 
   adminMediaApi, 
@@ -34,6 +35,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 export function ClientLogosManagement() {
   const { isRtl } = useLanguage();
   const { canPerform } = useAuth();
+  const { refreshClientLogos } = useData();
 
 
   // State Management
@@ -97,11 +99,11 @@ export function ClientLogosManagement() {
     setError(null);
     try {
       const response = await adminClientLogosApi.getAll();
-      if (Array.isArray(response.data)) {
-        setLogos(response.data);
-      } else {
-        setLogos([]);
-      }
+      const rawData = Array.isArray(response.data) ? response.data : [];
+      const uniqueData = Array.from(
+        new Map<number, LaravelClientLogo>(rawData.map(item => [item.id, item])).values()
+      );
+      setLogos(uniqueData);
     } catch (err: any) {
       if (err?.status === 401) {
         handle401Error();
@@ -212,6 +214,7 @@ export function ClientLogosManagement() {
       triggerToast('تم إضافة شعار العميل بنجاح.');
       setIsCreateModalOpen(false);
       await fetchLogos();
+      if (refreshClientLogos) refreshClientLogos();
     } catch (err: any) {
       if (err?.status === 401) handle401Error();
       else if (err?.status === 403) triggerToast('غير مصرح لك بإضافة شعارات العملاء.', 'danger');
@@ -251,6 +254,7 @@ export function ClientLogosManagement() {
       triggerToast('تم تحديث بيانات شعار العميل بنجاح.');
       setEditingLogo(null);
       await fetchLogos();
+      if (refreshClientLogos) refreshClientLogos();
     } catch (err: any) {
       if (err?.status === 401) handle401Error();
       else if (err?.status === 403) triggerToast('غير مصرح لك بتعديل شعارات العملاء.', 'danger');
@@ -268,6 +272,7 @@ export function ClientLogosManagement() {
       await adminClientLogosApi.update(logo.id, { is_active: updatedIsActive });
       setLogos(prev => prev.map(item => item.id === logo.id ? { ...item, is_active: updatedIsActive } : item));
       triggerToast(`تم تحديث حالة الشعار إلى: ${updatedIsActive ? 'نشط (منشور)' : 'مخفي'}`);
+      if (refreshClientLogos) refreshClientLogos();
     } catch (err: any) {
       if (err?.status === 401) handle401Error();
       else if (err?.status === 403) triggerToast('غير مصرح لك بتعديل حالة الشعار.', 'danger');
@@ -283,6 +288,7 @@ export function ClientLogosManagement() {
       triggerToast('تم حذف الشعار بشكل نهائي من قاعدة البيانات.', 'danger');
       setLogoToDelete(null);
       await fetchLogos();
+      if (refreshClientLogos) refreshClientLogos();
     } catch (err: any) {
       if (err?.status === 401) handle401Error();
       else if (err?.status === 403) triggerToast('غير مصرح لك بحذف شعار هذا العميل.', 'danger');

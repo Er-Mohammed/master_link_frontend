@@ -19,7 +19,7 @@ export function Logo({
   const { settings } = useData();
 
   // If a custom company logo is uploaded in dashboard settings, use it. Otherwise use the primary official logo asset.
-  const customLogo = settings?.companyLogo;
+  const customLogo = settings?.siteLogo || settings?.companyLogo;
   const isLight = variant === 'light';
   
   // Use Vite imported asset as primary source, with direct fallback
@@ -34,18 +34,15 @@ export function Logo({
     >
       <img 
         src={logoSrc} 
-        alt={settings?.companyNameEn || "Master Link"} 
-        className={`w-auto object-contain transition-all duration-300 drop-shadow-sm ${imgClassName}`}
-        style={{
-          aspectRatio: '350 / 100'
-        }}
+        alt={settings?.siteName || settings?.companyNameEn || "Master Link"} 
+        className={`max-h-full max-w-full w-auto object-contain transition-all duration-300 drop-shadow-sm ${imgClassName}`}
         loading="eager"
         decoding="async"
         onError={(e) => {
           // Fallback if dynamic URL fails to resolve
           const target = e.target as HTMLImageElement;
-          const fallback = isLight ? '/masterlink-logo.svg' : '/masterlink-logo-white.svg';
-          if (target.src !== window.location.origin + fallback && target.src !== fallback) {
+          const fallback = isLight ? logoDark : logoWhite;
+          if (target.src !== fallback) {
             target.src = fallback;
           }
         }}

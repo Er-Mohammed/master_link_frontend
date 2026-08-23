@@ -168,25 +168,25 @@ export interface ClientLogo {
 
 export interface ServiceItem {
   id: string;
-  nameEn: string;
-  nameAr: string;
+  nameEn?: string;
+  nameAr?: string;
   title?: string;
-  descriptionEn: string;
-  descriptionAr: string;
+  descriptionEn?: string;
+  descriptionAr?: string;
   shortDescription?: string;
   fullDescription?: string;
   slug: string;
-  displayOrder: number;
+  displayOrder?: number;
   sortOrder?: number;
-  status: 'active' | 'hidden' | 'deleted';
+  status?: 'active' | 'hidden' | 'deleted';
   isActive?: boolean;
-  iconName: string;
-  coverImage: string;
+  iconName?: string;
+  coverImage?: string;
   videoUrl?: string;
   videoType?: 'direct' | 'youtube' | 'vimeo';
-  createdAt: string;
-  featuresEn: string[];
-  featuresAr: string[];
+  createdAt?: string;
+  featuresEn?: string[];
+  featuresAr?: string[];
   serviceMedia?: ServiceMediaItem[];
 }
 
@@ -269,18 +269,33 @@ export interface SettingsState {
   aboutCompanyEn: string;
   aboutCompanyAr: string;
   socials: SocialLinkItem[];
-  seoTitleEn: string;
-  seoTitleAr: string;
-  seoDescriptionEn: string;
-  seoDescriptionAr: string;
-  seoKeywordsEn: string;
-  seoKeywordsAr: string;
-  ogImage: string;
+  seoTitleEn?: string;
+  seoTitleAr?: string;
+  seoDescriptionEn?: string;
+  seoDescriptionAr?: string;
+  seoKeywordsEn?: string;
+  seoKeywordsAr?: string;
+  ogImage?: string;
   defaultLanguage: 'en' | 'ar';
   timezone: string;
   dateFormat: string;
   enableMaintenance: boolean;
-  enableCdnCache: boolean;
+  enableCdnCache?: boolean;
+  siteName?: string;
+  siteLogo?: string | null;
+  site_logo?: string | null;
+}
+
+export interface ProjectCategory {
+  id: number;
+  name: string;
+  slug: string;
+  description: string | null;
+  sort_order: number;
+  is_active: boolean;
+  projects_count?: number;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface ConsultationItem {

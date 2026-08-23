@@ -26,9 +26,12 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
+import { useData } from '../../../context/DataContext';
+
 export function Index() {
   const { isRtl } = useLanguage();
   const { canPerform } = useAuth();
+  const { refreshTestimonials } = useData();
 
 
   // Testimonials State
@@ -70,6 +73,7 @@ export function Index() {
       } else {
         setTestimonials([]);
       }
+      refreshTestimonials();
     } catch (err: any) {
       if (err?.status === 401) {
         handle401Error();
@@ -129,6 +133,7 @@ export function Index() {
       const updatedStatus = !t.is_active;
       await adminTestimonialsApi.update(t.id, { is_active: updatedStatus });
       setTestimonials(prev => prev.map(item => item.id === t.id ? { ...item, is_active: updatedStatus } : item));
+      refreshTestimonials();
       showToast(isRtl ? `تم تحديث حالة الرأي إلى: ${updatedStatus ? 'مفعل' : 'غير مفعل'}` : `Status updated to ${updatedStatus ? 'Active' : 'Inactive'}`);
     } catch (err: any) {
       if (err?.status === 401) handle401Error();

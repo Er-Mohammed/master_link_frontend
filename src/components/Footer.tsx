@@ -17,10 +17,10 @@ export function Footer() {
     { name: isRtl ? 'شركاء النجاح' : 'Success Partners', href: '#clients' }
   ];
 
-  const activeServices = services.filter(s => s.status === 'active');
+  const activeServices = services.filter(s => s.isActive);
   const servicesLinks = activeServices.length > 0
     ? activeServices.map(s => ({
-        name: language === 'ar' ? s.nameAr : s.nameEn,
+        name: s.title,
         href: '#services'
       }))
     : t.services.map(s => ({

@@ -1,8 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useLanguage } from '../../../context/LanguageContext';
 import { useAuth } from '../../../context/AuthContext';
+import { useData } from '../../../context/DataContext';
 import { 
   adminSiteSettingsApi, 
+  adminMediaApi,
   authApi, 
   LaravelSiteSetting 
 } from '../../../services/api';
@@ -36,7 +38,8 @@ import {
   Clock,
   Globe,
   Lock,
-  Sparkles
+  Sparkles,
+  FolderOpen
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -55,6 +58,7 @@ const SOCIAL_KEYS: Record<string, { label: string; icon: any; defaultKey: string
 export function Index() {
   const { isRtl } = useLanguage();
   const { canPerform, canAccess } = useAuth();
+  const { refreshSettings } = useData();
 
   // Guard access to Site Settings (Super Admin only)
   if (!canAccess('settings')) {
@@ -74,6 +78,27 @@ export function Index() {
 
   // Media Selector Modal state for logo
   const [isMediaSelectorOpen, setIsMediaSelectorOpen] = useState(false);
+  const logoFileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+
+  const handleDirectLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      setIsUploadingLogo(true);
+      const res = await adminMediaApi.upload(file, 'Site Logo');
+      const uploadedUrl = res.data?.url || (res.data as any)?.file_path;
+      if (uploadedUrl) {
+        updateFormField('site_logo', uploadedUrl);
+        triggerToast(isRtl ? 'تم رفع الشعار وتعيينه بنجاح.' : 'Logo uploaded and selected successfully.', 'success');
+      }
+    } catch (err: any) {
+      triggerToast(err?.message || (isRtl ? 'فشل رفع صورة الشعار.' : 'Failed to upload logo.'), 'error');
+    } finally {
+      setIsUploadingLogo(false);
+      if (logoFileInputRef.current) logoFileInputRef.current.value = '';
+    }
+  };
 
   // Key-value form dictionary
   const [formState, setFormState] = useState<Record<string, string>>({
@@ -205,6 +230,7 @@ export function Index() {
       });
 
       await Promise.all(updatePromises);
+      await refreshSettings();
 
       triggerToast(
         isRtl ? 'تم حفظ وتنسيق جميع إعدادات الموقع بنجاح في Laravel API.' : 'Site settings updated successfully.',
@@ -405,20 +431,36 @@ export function Index() {
                           </div>
                           
                           <div className="flex-1 space-y-2">
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-2">
                               <input
                                 type="text"
                                 value={formState.site_logo}
                                 onChange={(e) => updateFormField('site_logo', e.target.value)}
                                 placeholder="https://..."
-                                className="block w-full px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-[#F20530] font-mono"
+                                className="block flex-1 min-w-[200px] px-3.5 py-2.5 bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-[#F20530] font-mono"
+                              />
+                              <input
+                                type="file"
+                                ref={logoFileInputRef}
+                                onChange={handleDirectLogoUpload}
+                                accept="image/*"
+                                className="hidden"
                               />
                               <button
                                 type="button"
-                                onClick={() => setIsMediaSelectorOpen(true)}
-                                className="px-4 py-2.5 bg-[#F20530] hover:bg-rose-600 text-white rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer flex items-center gap-1.5"
+                                onClick={() => logoFileInputRef.current?.click()}
+                                disabled={isUploadingLogo}
+                                className="px-3.5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
                               >
-                                <UploadCloud className="w-4 h-4" />
+                                {isUploadingLogo ? <Loader2 className="w-4 h-4 animate-spin" /> : <UploadCloud className="w-4 h-4" />}
+                                <span>{isRtl ? 'رفع ملف' : 'Upload'}</span>
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setIsMediaSelectorOpen(true)}
+                                className="px-3.5 py-2.5 bg-[#F20530] hover:bg-rose-600 text-white rounded-xl text-xs font-bold shrink-0 transition-all cursor-pointer flex items-center gap-1.5"
+                              >
+                                <FolderOpen className="w-4 h-4" />
                                 <span>{isRtl ? 'من المكتبة' : 'From Library'}</span>
                               </button>
                             </div>
@@ -649,7 +691,8 @@ export function Index() {
         onClose={() => setIsMediaSelectorOpen(false)}
         selectable={true}
         onSelectMedia={(media) => {
-          updateFormField('site_logo', media.file_path);
+          const selectedUrl = media.url || (media as any).file_path || '';
+          updateFormField('site_logo', selectedUrl);
           setIsMediaSelectorOpen(false);
           triggerToast(isRtl ? 'تم اختيار الشعار من المكتبة بنجاح.' : 'Logo selected from library.', 'success');
         }}

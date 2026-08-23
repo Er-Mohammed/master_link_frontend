@@ -29,7 +29,19 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
-export function MediaLibrary() {
+export interface MediaLibraryProps {
+  isOpen?: boolean;
+  onClose?: () => void;
+  selectable?: boolean;
+  onSelectMedia?: (media: LaravelMedia) => void;
+}
+
+export function MediaLibrary({
+  isOpen,
+  onClose,
+  selectable = false,
+  onSelectMedia
+}: MediaLibraryProps = {}) {
   const { language, isRtl } = useLanguage();
   const { canPerform } = useAuth();
 
@@ -368,7 +380,9 @@ export function MediaLibrary() {
     );
   };
 
-  return (
+  if (isOpen !== undefined && !isOpen) return null;
+
+  const content = (
     <div className={`space-y-6 ${isRtl ? 'text-right' : 'text-left'}`}>
       
       {/* Toast Alert Banner */}
@@ -780,6 +794,19 @@ export function MediaLibrary() {
                     
                     {/* Hover Overlay */}
                     <div className="absolute inset-0 bg-slate-950/50 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center gap-2">
+                      {(selectable || onSelectMedia) && (
+                        <button
+                          onClick={() => {
+                            if (onSelectMedia) onSelectMedia(item);
+                            if (onClose) onClose();
+                          }}
+                          className="px-3 py-2 rounded-xl bg-[#F20530] text-white hover:bg-rose-600 text-xs font-bold transition-all cursor-pointer shadow-md flex items-center gap-1.5"
+                          title={isRtl ? 'اختيار' : 'Select'}
+                        >
+                          <CheckCircle2 className="w-4 h-4" />
+                          <span>{isRtl ? 'اختيار' : 'Select'}</span>
+                        </button>
+                      )}
                       <button
                         onClick={() => setPreviewItem(item)}
                         className="p-2 rounded-xl bg-white text-slate-900 hover:bg-rose-500 hover:text-white transition-all cursor-pointer shadow-md"
@@ -847,6 +874,19 @@ export function MediaLibrary() {
                         <span>{item.created_at ? new Date(item.created_at).toLocaleDateString(isRtl ? 'ar-SA' : 'en-US') : '-'}</span>
                       </div>
                     </div>
+
+                    {(selectable || onSelectMedia) && (
+                      <button
+                        onClick={() => {
+                          if (onSelectMedia) onSelectMedia(item);
+                          if (onClose) onClose();
+                        }}
+                        className="w-full mt-2 py-2 px-3 bg-[#F20530] hover:bg-rose-600 text-white rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+                      >
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>{isRtl ? 'اختيار هذه الصورة' : 'Select Asset'}</span>
+                      </button>
+                    )}
                   </div>
                 </motion.div>
               ))}
@@ -915,6 +955,18 @@ export function MediaLibrary() {
 
                         <td className="py-3 px-5 text-right">
                           <div className="flex items-center justify-end gap-1.5">
+                            {(selectable || onSelectMedia) && (
+                              <button
+                                onClick={() => {
+                                  if (onSelectMedia) onSelectMedia(item);
+                                  if (onClose) onClose();
+                                }}
+                                className="px-3 py-1.5 bg-[#F20530] hover:bg-rose-600 text-white rounded-lg text-xs font-bold transition-all flex items-center gap-1 cursor-pointer shadow-xs mr-2"
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>{isRtl ? 'اختيار' : 'Select'}</span>
+                              </button>
+                            )}
                             <button
                               onClick={() => setPreviewItem(item)}
                               className="p-1.5 rounded-lg text-slate-400 hover:text-slate-900 hover:bg-slate-100 transition-all cursor-pointer"
@@ -1197,4 +1249,40 @@ export function MediaLibrary() {
 
     </div>
   );
+
+  if (isOpen) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 overflow-y-auto">
+        <div className="fixed inset-0 bg-black/75 backdrop-blur-sm" onClick={onClose} />
+        <div className="relative bg-white rounded-3xl border border-slate-200 shadow-2xl w-full max-w-6xl max-h-[90vh] overflow-y-auto p-6 z-10 space-y-6">
+          <div className={`flex items-center justify-between border-b border-slate-100 pb-4 sticky top-0 bg-white z-20 pt-1 ${isRtl ? 'flex-row-reverse' : ''}`}>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-rose-50 border border-rose-100 text-[#F20530] flex items-center justify-center font-bold">
+                <FolderOpen className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900">
+                  {isRtl ? 'مكتبة الوسائط - اختيار الشعار / الصورة' : 'Media Library - Select Asset'}
+                </h3>
+                <p className="text-xs text-slate-400 font-semibold">
+                  {isRtl ? 'انقر على "اختيار" لتحديد الملف المطلوب' : 'Click "Select" to pick an asset'}
+                </p>
+              </div>
+            </div>
+            {onClose && (
+              <button
+                onClick={onClose}
+                className="p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-900 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            )}
+          </div>
+          {content}
+        </div>
+      </div>
+    );
+  }
+
+  return content;
 }

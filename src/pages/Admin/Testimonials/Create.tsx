@@ -109,12 +109,15 @@ export function Create({ isOpen, onClose, onSuccess }: CreateProps) {
 
     setMediaUploadLoading(true);
     try {
-      const uploadedMedia = await adminMediaApi.upload(file, displayName || file.name);
-      setAvailableMedia(prev => [uploadedMedia, ...prev]);
-      setSelectedMediaId(uploadedMedia.id);
-      setSelectedMediaUrl(uploadedMedia.url);
-      setIsMediaPickerOpen(false);
-      showToast(isRtl ? 'تم رفع الصورة بنجاح وتحديدها!' : 'Image uploaded successfully!');
+      const response = await adminMediaApi.upload(file, displayName || file.name);
+      const uploadedMedia = response.data;
+      if (uploadedMedia) {
+        setAvailableMedia(prev => [uploadedMedia, ...prev]);
+        setSelectedMediaId(uploadedMedia.id);
+        setSelectedMediaUrl(uploadedMedia.url);
+        setIsMediaPickerOpen(false);
+        showToast(isRtl ? 'تم رفع الصورة بنجاح وتحديدها!' : 'Image uploaded successfully!');
+      }
     } catch (err: any) {
       if (err?.status === 401) handle401Error();
       else showToast(err?.message || (isRtl ? 'فشل رفع الصورة' : 'Failed to upload image'), 'danger');

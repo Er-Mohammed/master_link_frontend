@@ -482,25 +482,37 @@ export function ServicesOverview() {
   };
 
   // Filter active services from CMS context
-  const activeCmsServices = cmsServices.filter(s => s.status === 'active');
+  const activeCmsServices = cmsServices.filter(s => s.isActive);
 
   // Map CMS items or fallback to static translations
   const displayedServices = activeCmsServices.length > 0
-    ? activeCmsServices.map(s => ({
-        id: s.id,
-        title: language === 'ar' ? s.nameAr : s.nameEn,
-        description: language === 'ar' ? s.descriptionAr : s.descriptionEn,
-        features: language === 'ar' ? s.featuresAr : s.featuresEn,
-        iconName: s.iconName,
-        coverImage: s.coverImage,
-        videoUrl: s.videoUrl,
-        videoType: s.videoType,
-        serviceMedia: s.serviceMedia
-      }))
+    ? activeCmsServices.map(s => {
+        const fullDesc = s.fullDescription || '';
+        const parsedFeatures = fullDesc
+          ? fullDesc
+              .split(/\r?\n/)
+              .map(line => line.trim().replace(/^[-*•]\s*/, ''))
+              .filter(Boolean)
+          : [];
+
+        return {
+          id: s.id,
+          title: s.title,
+          description: s.shortDescription || fullDesc || '',
+          fullDescription: fullDesc,
+          features: parsedFeatures,
+          iconName: 'Code2',
+          coverImage: s.coverImage,
+          videoUrl: undefined,
+          videoType: undefined,
+          serviceMedia: s.serviceMedia
+        };
+      })
     : t.services.map(s => ({
         id: s.id,
         title: s.title,
         description: s.description,
+        fullDescription: s.description,
         features: s.features,
         iconName: s.id,
         coverImage: undefined,
@@ -583,18 +595,20 @@ export function ServicesOverview() {
                       {service.description}
                     </p>
 
-                    {/* Quick Feature Chips / Tags (Top 3 features) */}
-                    <div className="flex flex-wrap gap-2 mb-4">
-                      {service.features.slice(0, 3).map((feat, fIdx) => (
-                        <span 
-                          key={fIdx}
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100/90 border border-slate-200/70 text-slate-700 text-[11px] font-semibold"
-                        >
-                          <Check className="w-3 h-3 text-[#5683FC] shrink-0" />
-                          <span className="truncate max-w-[150px]">{feat}</span>
-                        </span>
-                      ))}
-                    </div>
+                    {/* Quick Feature Chips / Tags (Top 3 features if available) */}
+                    {service.features && service.features.length > 0 && (
+                      <div className="flex flex-wrap gap-2 mb-4">
+                        {service.features.slice(0, 3).map((feat, fIdx) => (
+                          <span 
+                            key={fIdx}
+                            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-slate-100/90 border border-slate-200/70 text-slate-700 text-[11px] font-semibold"
+                          >
+                            <Check className="w-3 h-3 text-[#5683FC] shrink-0" />
+                            <span className="truncate max-w-[150px]">{feat}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
 
                     {/* Accordion for Remaining Features if expanded */}
                     <AnimatePresence initial={false}>
@@ -607,17 +621,29 @@ export function ServicesOverview() {
                           className="overflow-hidden"
                         >
                           <div className="pt-4 mt-2 border-t border-slate-100 space-y-3">
-                            <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-                              {t.servicesCapabilities}
+                            <p className="text-[11px] font-bold text-[#F20530] uppercase tracking-wider flex items-center gap-1.5">
+                              <Sparkles className="w-3.5 h-3.5 text-[#5683FC]" />
+                              <span>{t.servicesCapabilities}</span>
                             </p>
-                            <ul className="space-y-2">
-                              {service.features.map((feat, fIdx) => (
-                                <li key={fIdx} className="flex items-start gap-2 text-xs text-slate-800 font-medium">
-                                  <Check className="w-3.5 h-3.5 text-[#F20530] shrink-0 mt-0.5" />
-                                  <span>{feat}</span>
-                                </li>
-                              ))}
-                            </ul>
+                            
+                            {service.features && service.features.length > 0 ? (
+                              <ul className="space-y-2">
+                                {service.features.map((feat, fIdx) => (
+                                  <li key={fIdx} className="flex items-start gap-2 text-xs text-slate-800 font-medium">
+                                    <Check className="w-3.5 h-3.5 text-[#F20530] shrink-0 mt-0.5" />
+                                    <span>{feat}</span>
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : service.fullDescription ? (
+                              <p className="text-xs text-slate-700 leading-relaxed font-medium whitespace-pre-line">
+                                {service.fullDescription}
+                              </p>
+                            ) : (
+                              <p className="text-xs text-slate-400 italic font-normal">
+                                {isRtl ? 'لا تتوفر تفاصيل إضافية حالياً لهذه الخدمة.' : 'No additional capabilities listed for this service.'}
+                              </p>
+                            )}
                           </div>
                         </motion.div>
                       )}

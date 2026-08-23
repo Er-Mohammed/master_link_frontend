@@ -240,6 +240,21 @@ export const adminApi = {
     return apiFetch<T>(url, {
       method: 'DELETE'
     });
+  },
+
+  async getBlob(url: string): Promise<Blob> {
+    const token = getStoredToken();
+    const headers: Record<string, string> = {
+      'Accept': '*/*',
+    };
+    if (token) {
+      headers['Authorization'] = `Bearer ${token}`;
+    }
+    const res = await fetch(`${API_BASE_URL}${url}`, { headers });
+    if (!res.ok) {
+      throw new Error(`HTTP error ${res.status}`);
+    }
+    return await res.blob();
   }
 };
 
@@ -456,6 +471,14 @@ export interface LaravelProjectPayload {
   is_active?: boolean;
 }
 
+export interface LaravelProjectCategoryPayload {
+  name: string;
+  slug: string;
+  description?: string | null;
+  sort_order?: number;
+  is_active?: boolean;
+}
+
 export const adminProjectCategoriesApi = {
   async getAll(params?: {
     search?: string;
@@ -475,6 +498,22 @@ export const adminProjectCategoriesApi = {
 
     const queryString = query.toString() ? `?${query.toString()}` : '';
     return adminApi.get<LaravelPaginatedResponse<LaravelProjectCategory>>(`/api/admin/project-categories${queryString}`);
+  },
+
+  async getById(id: number | string): Promise<LaravelApiResponse<LaravelProjectCategory>> {
+    return adminApi.get<LaravelApiResponse<LaravelProjectCategory>>(`/api/admin/project-categories/${id}`);
+  },
+
+  async create(payload: LaravelProjectCategoryPayload): Promise<LaravelApiResponse<LaravelProjectCategory>> {
+    return adminApi.post<LaravelApiResponse<LaravelProjectCategory>>('/api/admin/project-categories', payload);
+  },
+
+  async update(id: number | string, payload: Partial<LaravelProjectCategoryPayload>): Promise<LaravelApiResponse<LaravelProjectCategory>> {
+    return adminApi.put<LaravelApiResponse<LaravelProjectCategory>>(`/api/admin/project-categories/${id}`, payload);
+  },
+
+  async delete(id: number | string): Promise<{ success: boolean; message: string }> {
+    return adminApi.delete<{ success: boolean; message: string }>(`/api/admin/project-categories/${id}`);
   }
 };
 
@@ -806,6 +845,18 @@ export const adminConsultationsApi = {
 
   async delete(id: number | string): Promise<{ success: boolean; message: string }> {
     return adminApi.delete<{ success: boolean; message: string }>(`/api/admin/consultations/${id}`);
+  },
+
+  async exportExcel(params?: Record<string, any>): Promise<Blob> {
+    const query = new URLSearchParams(params).toString();
+    const queryString = query ? `?${query}` : '';
+    return adminApi.getBlob(`/api/admin/consultations/export/excel${queryString}`);
+  },
+
+  async exportPdf(params?: Record<string, any>): Promise<Blob> {
+    const query = new URLSearchParams(params).toString();
+    const queryString = query ? `?${query}` : '';
+    return adminApi.getBlob(`/api/admin/consultations/export/pdf${queryString}`);
   }
 };
 
