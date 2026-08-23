@@ -8,8 +8,10 @@ import { Logo } from './Logo';
 import {
   adminServicesApi,
   adminProjectsApi,
+  adminConsultationsApi,
   LaravelService,
-  LaravelProject
+  LaravelProject,
+  LaravelConsultation
 } from '../services/api';
 import { ServicesManagement } from './ServicesManagement';
 import { PortfolioManagement } from './PortfolioManagement';
@@ -128,6 +130,8 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   const { consultations, setConsultations, addTestimonial } = useData();
 
   const [realProjectsCount, setRealProjectsCount] = useState<number | null>(null);
+  const [newConsultations, setNewConsultations] = useState<LaravelConsultation[]>([]);
+  const [newConsultationsLoading, setNewConsultationsLoading] = useState<boolean>(true);
 
   useEffect(() => {
     adminProjectsApi.getAll({ per_page: 1 }).then(res => {
@@ -138,6 +142,26 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
       }
     }).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    if (activeTab === 'dashboard') {
+      setNewConsultationsLoading(true);
+      adminConsultationsApi.getAll({
+        status: 'new',
+        sort: 'created_at',
+        direction: 'desc',
+        per_page: 50
+      }).then(res => {
+        if (Array.isArray(res.data)) {
+          setNewConsultations(res.data.filter(c => c.status === 'new'));
+        }
+      }).catch(err => {
+        console.warn('Failed to fetch new consultations notifications from API:', err);
+      }).finally(() => {
+        setNewConsultationsLoading(false);
+      });
+    }
+  }, [activeTab]);
 
   const [projects, setProjects] = useState([
     { 
@@ -448,7 +472,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
         
         {/* Top Logo and Header Branding */}
         <div className="p-6 border-b border-slate-200/80 flex items-center justify-between">
-          <Logo variant="light" className="h-8" imgClassName="h-8 w-auto object-contain" />
+          <Logo variant="admin" className="h-10 sm:h-12 max-w-[180px]" imgClassName="h-full w-auto max-w-full object-contain" />
         </div>
 
         {/* Sidebar Menu Items */}
@@ -546,7 +570,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
               }`}
             >
               <div className="p-6 border-b border-slate-200 flex items-center justify-between">
-                <Logo variant="light" className="h-8" imgClassName="h-8 w-auto object-contain" />
+                <Logo variant="admin" className="h-10 sm:h-12 max-w-[180px]" imgClassName="h-full w-auto max-w-full object-contain" />
                 <button 
                   onClick={() => setIsMobileSidebarOpen(false)}
                   className="p-1.5 rounded-lg bg-slate-100 border border-slate-200 text-slate-500 hover:text-slate-900 cursor-pointer"
@@ -697,7 +721,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                 {[
                   { titleEn: 'Services', titleAr: 'الخدمات الرقمية', value: services.length, icon: Briefcase, color: 'text-rose-500 bg-rose-50', change: '+1 New', descEn: 'Commercial solutions', descAr: 'الحلول البرمجية المعروضة' },
                   { titleEn: 'Projects', titleAr: 'المشاريع الحية', value: realProjectsCount ?? projects.length, icon: FileText, color: 'text-blue-500 bg-blue-50', change: '+2 Active', descEn: 'Production deployments', descAr: 'عمليات النشر السحابية' },
-                  { titleEn: 'Consultations', titleAr: 'حجوزات الاستشارات', value: consultations.length, icon: MessageSquare, color: 'text-amber-500 bg-amber-50', change: isRtl ? `${consultations.filter(c => c.status === 'new' || c.status === 'pending').length} قيد المتابعة` : `${consultations.filter(c => c.status === 'new' || c.status === 'pending').length} Pending`, descEn: 'Enterprise clients', descAr: 'حجوزات الشركات والعملاء' },
+                  { titleEn: 'New Consultations', titleAr: 'إشعارات الاستشارات', value: newConsultations.length, icon: MessageSquare, color: 'text-amber-500 bg-amber-50', change: isRtl ? `🔔 ${newConsultations.length} جديدة` : `🔔 ${newConsultations.length} New`, descEn: 'Unprocessed requests', descAr: 'طلبات جديدة قيد الانتظار' },
                   { titleEn: 'Media Files', titleAr: 'ملفات الوسائط', value: '142', icon: ImageIcon, color: 'text-emerald-500 bg-emerald-50', change: '742 MB Used', descEn: 'Cloud CDN assets', descAr: 'أصول الوسائط الرقمية' },
                   { titleEn: 'Admins', titleAr: 'المشرفين النشطين', value: '4', icon: Users, color: 'text-slate-500 bg-slate-50', change: 'All online', descEn: 'Zero-trust roles', descAr: 'المدراء بصلاحيات كاملة' }
                 ].map((stat, idx) => {
@@ -735,15 +759,16 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                 {/* LEFT 8-COLS: RECENT CONSULTATIONS & PROJECTS & ARTICLES */}
                 <div className="lg:col-span-8 space-y-8">
                   
-                  {/* RECENT CONSULTATIONS LISTING (READ-ONLY DISPLAY) */}
+                  {/* RECENT CONSULTATIONS LISTING (NEW NOTIFICATIONS ONLY) */}
                   <div className="bg-white rounded-2xl border border-slate-200 p-6 sm:p-8 space-y-6 shadow-sm">
                     <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-100 pb-5 ${isRtl ? 'flex-row-reverse text-right' : 'flex-row text-left'}`}>
                       <div>
-                        <h3 className="text-lg font-extrabold text-slate-900 tracking-tight">
-                          {t.recentConsultations}
+                        <h3 className="text-lg font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+                          <span>🔔</span>
+                          <span>{isRtl ? 'إشعارات الاستشارات الجديدة' : 'New Consultation Alerts'}</span>
                         </h3>
                         <p className="text-xs text-slate-400 font-semibold mt-0.5">
-                          {isRtl ? 'سجل استفسارات وحجوزات العملاء المسجلة في المنظومة' : 'Direct overview of recorded client consultation requests.'}
+                          {isRtl ? 'طلبات الاستشارات الجديدة بحالة (جديدة) تنتظر المراجعة والتأكيد' : 'Client requests with status (new) waiting for review.'}
                         </p>
                       </div>
                       <button 
@@ -752,7 +777,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                         }}
                         className="text-xs font-extrabold text-[#F20530] hover:text-rose-600 transition-colors cursor-pointer flex items-center gap-1.5"
                       >
-                        <span>{isRtl ? 'عرض سجل الاستشارات' : 'View Consultations'}</span>
+                        <span>{isRtl ? 'إدارة كل الاستشارات' : 'Manage All Consultations'}</span>
                         <ArrowUpRight className="w-4 h-4" />
                       </button>
                     </div>
@@ -769,34 +794,33 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
-                          {consultations.length === 0 ? (
+                          {newConsultationsLoading ? (
                             <tr>
                               <td colSpan={5} className="py-8 text-center text-slate-400 font-bold">
-                                {isRtl ? 'لا توجد طلبات استشارات مسجلة حالياً' : 'No consultation records available'}
+                                {isRtl ? 'جاري تحميل الإشعارات من Laravel...' : 'Loading notifications from Laravel...'}
+                              </td>
+                            </tr>
+                          ) : newConsultations.length === 0 ? (
+                            <tr>
+                              <td colSpan={5} className="py-8 text-center text-slate-400 font-bold">
+                                <div className="space-y-1">
+                                  <p className="text-slate-500 font-extrabold">{isRtl ? 'لا توجد استشارات جديدة 🔔' : 'No new consultation alerts 🔔'}</p>
+                                  <p className="text-[11px] text-slate-400 font-normal">{isRtl ? 'تمت معالجة جميع الطلبات أو لا توجد استشارات معلقة حالياً.' : 'All requests processed or no pending new submissions.'}</p>
+                                </div>
                               </td>
                             </tr>
                           ) : (
-                            consultations.slice(0, 5).map((c) => (
+                            newConsultations.map((c) => (
                               <tr key={c.id} className="hover:bg-slate-50/40 transition-colors">
-                                <td className="py-4 font-bold text-slate-900">{isRtl ? (c.nameAr || c.nameEn) : (c.nameEn || c.nameAr)}</td>
-                                <td className="py-4 text-slate-500 font-medium">{isRtl ? (c.companyAr || c.companyEn) : (c.companyEn || c.companyAr)}</td>
-                                <td className="py-4 text-slate-700">{isRtl ? (c.subjectAr || c.subjectEn) : (c.subjectEn || c.subjectAr)}</td>
-                                <td className="py-4 font-mono text-slate-400">{c.date}</td>
+                                <td className="py-4 font-bold text-slate-900">{c.name}</td>
+                                <td className="py-4 text-slate-500 font-medium">{c.company_name || (isRtl ? 'فردي' : 'Individual')}</td>
+                                <td className="py-4 text-slate-700">{c.service ? c.service.title : (isRtl ? 'استفسار عام' : 'General Strategy Consultation')}</td>
+                                <td className="py-4 font-mono text-slate-400">{c.created_at ? new Date(c.created_at).toLocaleDateString(isRtl ? 'ar-SA' : 'en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—'}</td>
                                 <td className="py-4">
                                   <div className="flex justify-center">
-                                    <span
-                                      className={`px-3 py-1.5 rounded-lg text-[10px] font-bold select-none cursor-default inline-flex items-center gap-1.5 ${
-                                        c.status === 'completed' 
-                                          ? 'bg-emerald-50 text-emerald-800 border border-emerald-200/60' 
-                                          : c.status === 'pending'
-                                          ? 'bg-amber-50 text-amber-800 border border-amber-200/60'
-                                          : 'bg-rose-50 text-[#F20530] border border-rose-200/60'
-                                      }`}
-                                    >
-                                      <span className={`w-1.5 h-1.5 rounded-full ${
-                                        c.status === 'completed' ? 'bg-emerald-500' : c.status === 'pending' ? 'bg-amber-500' : 'bg-[#F20530]'
-                                      }`} />
-                                      {c.status === 'completed' ? (isRtl ? 'مكتملة' : 'Completed') : c.status === 'pending' ? (isRtl ? 'قيد الانتظار' : 'Pending') : (isRtl ? 'جديدة' : 'New Client')}
+                                    <span className="px-3 py-1.5 rounded-lg text-[10px] font-bold select-none cursor-default inline-flex items-center gap-1.5 bg-rose-50 text-[#F20530] border border-rose-200/60">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-[#F20530] animate-pulse" />
+                                      {isRtl ? 'جديدة' : 'New Alert'}
                                     </span>
                                   </div>
                                 </td>

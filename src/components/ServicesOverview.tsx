@@ -179,18 +179,6 @@ function ServiceMediaCarousel({
         });
       }
     });
-
-    // 5. Add category-specific curated gallery photos for fallback
-    const categoryPreset = CATEGORY_GALLERIES[serviceId] || CATEGORY_GALLERIES['tech-services'];
-    categoryPreset.forEach(item => {
-      if (!slidesList.some(img => img.url === item.url)) {
-        slidesList.push({
-          url: item.url,
-          title: isRtl ? item.titleAr : item.titleEn,
-          type: 'image'
-        });
-      }
-    });
   }
 
   // Effect to resolve any IndexedDB-stored local videos for this service
@@ -209,6 +197,19 @@ function ServiceMediaCarousel({
 
   const totalSlides = slidesList.length;
   const currentSlide = slidesList[currentIndex] || slidesList[0];
+
+  if (totalSlides === 0 || !currentSlide) {
+    return (
+      <div className="relative w-full overflow-hidden bg-slate-950 aspect-[16/10] flex flex-col items-center justify-center text-slate-500 gap-2 p-4">
+        <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border backdrop-blur-md ${iconAccentClass}`}>
+          <IconComponent className="w-4 h-4 text-white" />
+          <span className="text-[11px] font-bold tracking-wide uppercase opacity-95 text-white">
+            {serviceTitle}
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   const handlePrev = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -484,42 +485,29 @@ export function ServicesOverview() {
   // Filter active services from CMS context
   const activeCmsServices = cmsServices.filter(s => s.isActive);
 
-  // Map CMS items or fallback to static translations
-  const displayedServices = activeCmsServices.length > 0
-    ? activeCmsServices.map(s => {
-        const fullDesc = s.fullDescription || '';
-        const parsedFeatures = fullDesc
-          ? fullDesc
-              .split(/\r?\n/)
-              .map(line => line.trim().replace(/^[-*•]\s*/, ''))
-              .filter(Boolean)
-          : [];
+  // Map CMS items directly from MySQL database
+  const displayedServices = activeCmsServices.map(s => {
+    const fullDesc = s.fullDescription || '';
+    const parsedFeatures = fullDesc
+      ? fullDesc
+          .split(/\r?\n/)
+          .map(line => line.trim().replace(/^[-*•]\s*/, ''))
+          .filter(Boolean)
+      : [];
 
-        return {
-          id: s.id,
-          title: s.title,
-          description: s.shortDescription || fullDesc || '',
-          fullDescription: fullDesc,
-          features: parsedFeatures,
-          iconName: 'Code2',
-          coverImage: s.coverImage,
-          videoUrl: undefined,
-          videoType: undefined,
-          serviceMedia: s.serviceMedia
-        };
-      })
-    : t.services.map(s => ({
-        id: s.id,
-        title: s.title,
-        description: s.description,
-        fullDescription: s.description,
-        features: s.features,
-        iconName: s.id,
-        coverImage: undefined,
-        videoUrl: undefined,
-        videoType: undefined,
-        serviceMedia: undefined
-      }));
+    return {
+      id: s.id,
+      title: s.title,
+      description: s.shortDescription || fullDesc || '',
+      fullDescription: fullDesc,
+      features: parsedFeatures,
+      iconName: 'Code2',
+      coverImage: s.coverImage,
+      videoUrl: undefined,
+      videoType: undefined,
+      serviceMedia: s.serviceMedia
+    };
+  });
 
   return (
     <section id="services" className="py-24 md:py-32 bg-slate-50/50 relative overflow-hidden text-slate-900">
@@ -541,8 +529,25 @@ export function ServicesOverview() {
           </p>
         </div>
 
-        {/* Services Grid - World-class Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-stretch">
+        {/* Services Grid - World-class Cards or Empty State */}
+        {displayedServices.length === 0 ? (
+          <div className="py-16 px-6 text-center bg-white rounded-3xl border border-slate-200/90 shadow-xs max-w-xl mx-auto space-y-4">
+            <div className="w-14 h-14 rounded-2xl bg-slate-100 text-slate-400 flex items-center justify-center mx-auto">
+              <Layers className="w-7 h-7" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-lg font-bold text-slate-800">
+                {isRtl ? 'لا تتوفر خدمات حالياً' : 'No Services Available'}
+              </h3>
+              <p className="text-xs text-slate-500 max-w-sm mx-auto leading-relaxed font-medium">
+                {isRtl
+                  ? 'لم يتم إضافة أي خدمات نشطة بعد في قاعدة البيانات. يمكن للإدارة إضافة خدمات جديدة من لوحة التحكم.'
+                  : 'No active services have been published to the database yet.'}
+              </p>
+            </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 items-stretch">
           {displayedServices.map((service, idx) => {
             const IconComponent = iconMap[service.iconName] || Code2;
             const isExpanded = expandedServiceId === service.id;
@@ -677,6 +682,7 @@ export function ServicesOverview() {
             );
           })}
         </div>
+        )}
 
       </div>
     </section>

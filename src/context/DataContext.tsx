@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { ClientLogo, MediaLibraryItem, TestimonialModel, ServiceMediaItem } from '../types';
+import { adminSiteSettingsApi, apiService } from '../services/api';
 
 export interface ServiceItem {
   id: string;
@@ -95,6 +96,8 @@ export interface SettingsState {
   companyNameEn: string;
   companyNameAr: string;
   companyLogo: string;
+  siteLogo?: string;
+  siteName?: string;
   companyEmail: string;
   companyPhone: string;
   companyAddressEn: string;
@@ -840,6 +843,7 @@ interface DataContextType {
   // Handlers for Settings
   setSettings: React.Dispatch<React.SetStateAction<SettingsState>>;
   updateSettings: (updated: Partial<SettingsState>) => void;
+  refreshSettings: () => Promise<void>;
 
   // Handlers for Consultations
   setConsultations: React.Dispatch<React.SetStateAction<ConsultationItem[]>>;
@@ -944,17 +948,9 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const saved = localStorage.getItem('masterlink_services_v3');
       if (saved) return JSON.parse(saved);
-      // Check if old storage has new items
-      const legacy = localStorage.getItem('masterlink_services');
-      if (legacy) {
-        const parsed = JSON.parse(legacy);
-        if (Array.isArray(parsed) && parsed.some((s: ServiceItem) => s.id === 'tech-services')) {
-          return parsed;
-        }
-      }
-      return DEFAULT_SERVICES;
+      return [];
     } catch {
-      return DEFAULT_SERVICES;
+      return [];
     }
   });
 
@@ -1085,6 +1081,39 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     safeSetLocalStorage('masterlink_media_library_v1', mediaItems);
   }, [mediaItems]);
 
+  // Initial Sync from Laravel API on App Launch (Single Source of Truth)
+  useEffect(() => {
+    let isMounted = true;
+
+    apiService.getServices().then(data => {
+      if (isMounted && Array.isArray(data)) {
+        setServices(data);
+      }
+    }).catch(err => {
+      console.warn('DataContext: Failed to fetch live services from Laravel:', err);
+    });
+
+    apiService.getProjects().then(data => {
+      if (isMounted && Array.isArray(data)) {
+        setProjects(data);
+      }
+    }).catch(err => {
+      console.warn('DataContext: Failed to fetch live projects from Laravel:', err);
+    });
+
+    apiService.getClientLogos().then(data => {
+      if (isMounted && Array.isArray(data)) {
+        setClientLogos(data);
+      }
+    }).catch(err => {
+      console.warn('DataContext: Failed to fetch live client logos from Laravel:', err);
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   // Service operations
   const addService = (service: ServiceItem) => {
     setServices(prev => [service, ...prev]);
@@ -1128,6 +1157,47 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const updateSettings = (updated: Partial<SettingsState>) => {
     setSettings(prev => ({ ...prev, ...updated }));
   };
+
+  const refreshSettings = useCallback(async () => {
+    try {
+      const response = await adminSiteSettingsApi.getAll();
+      const items = response.data || [];
+      if (Array.isArray(items) && items.length > 0) {
+        setSettings(prev => {
+          const updated: Partial<SettingsState> = {};
+          items.forEach(item => {
+            if (item.key === 'site_logo') updated.siteLogo = item.value || '';
+            if (item.key === 'company_logo') updated.companyLogo = item.value || '';
+            if (item.key === 'site_name') {
+              updated.companyNameAr = item.value || prev.companyNameAr;
+              updated.companyNameEn = item.value || prev.companyNameEn;
+            }
+            if (item.key === 'company_email') updated.companyEmail = item.value || prev.companyEmail;
+            if (item.key === 'company_phone') updated.companyPhone = item.value || prev.companyPhone;
+            if (item.key === 'company_address') {
+              updated.companyAddressAr = item.value || prev.companyAddressAr;
+              updated.companyAddressEn = item.value || prev.companyAddressEn;
+            }
+            if (item.key === 'working_hours') {
+              updated.workingHoursAr = item.value || prev.workingHoursAr;
+              updated.workingHoursEn = item.value || prev.workingHoursEn;
+            }
+            if (item.key === 'about_company') {
+              updated.aboutCompanyAr = item.value || prev.aboutCompanyAr;
+              updated.aboutCompanyEn = item.value || prev.aboutCompanyEn;
+            }
+          });
+          return { ...prev, ...updated };
+        });
+      }
+    } catch (err) {
+      console.warn('Could not refresh site settings from Laravel API:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    refreshSettings();
+  }, [refreshSettings]);
 
   // Consultation operations
   const addConsultation = (item: Omit<ConsultationItem, 'id' | 'date' | 'status'>) => {
@@ -1216,6 +1286,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         deletePost,
         setSettings,
         updateSettings,
+        refreshSettings,
         setConsultations,
         addConsultation,
         updateConsultationStatus,

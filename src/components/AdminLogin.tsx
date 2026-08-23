@@ -175,7 +175,7 @@ export function AdminLogin({ onBackToLanding, onLoginSuccess }: AdminLoginProps)
 
             {/* Brand Logo & Unit badge */}
             <div className="relative z-10">
-              <Logo variant="light" className="h-10" imgClassName="h-10 w-auto object-contain" />
+              <Logo variant="login" className="h-16 sm:h-20 max-w-[240px]" imgClassName="h-full w-auto max-w-full object-contain" />
             </div>
 
             {/* Premium Vector Tech Illustration */}
@@ -230,7 +230,7 @@ export function AdminLogin({ onBackToLanding, onLoginSuccess }: AdminLoginProps)
             
             {/* Header branding for mobile view only */}
             <div className="flex lg:hidden items-center gap-2.5 mb-8">
-              <Logo variant="light" className="h-8" imgClassName="h-8 w-auto object-contain" />
+              <Logo variant="login" className="h-12 sm:h-14 max-w-[200px]" imgClassName="h-full w-auto max-w-full object-contain" />
             </div>
 
             {/* Form Content */}

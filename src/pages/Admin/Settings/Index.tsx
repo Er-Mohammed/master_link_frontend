@@ -58,7 +58,7 @@ const SOCIAL_KEYS: Record<string, { label: string; icon: any; defaultKey: string
 export function Index() {
   const { isRtl } = useLanguage();
   const { canPerform, canAccess } = useAuth();
-  const { refreshSettings } = useData();
+  const { refreshSettings, updateSettings } = useData();
 
   // Guard access to Site Settings (Super Admin only)
   if (!canAccess('settings')) {
@@ -90,6 +90,7 @@ export function Index() {
       const uploadedUrl = res.data?.url || (res.data as any)?.file_path;
       if (uploadedUrl) {
         updateFormField('site_logo', uploadedUrl);
+        if (updateSettings) updateSettings({ siteLogo: uploadedUrl });
         triggerToast(isRtl ? 'تم رفع الشعار وتعيينه بنجاح.' : 'Logo uploaded and selected successfully.', 'success');
       }
     } catch (err: any) {
@@ -693,6 +694,7 @@ export function Index() {
         onSelectMedia={(media) => {
           const selectedUrl = media.url || (media as any).file_path || '';
           updateFormField('site_logo', selectedUrl);
+          if (updateSettings) updateSettings({ siteLogo: selectedUrl });
           setIsMediaSelectorOpen(false);
           triggerToast(isRtl ? 'تم اختيار الشعار من المكتبة بنجاح.' : 'Logo selected from library.', 'success');
         }}

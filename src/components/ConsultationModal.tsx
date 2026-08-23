@@ -4,6 +4,7 @@ import { X, Calendar, ArrowRight, ArrowLeft, CheckCircle2, Building, Mail, User,
 import { useLanguage } from '../context/LanguageContext';
 import { useData } from '../context/DataContext';
 import { pushSystemNotification } from './NotificationCenter';
+import { apiService } from '../services/api';
 
 interface ConsultationModalProps {
   isOpen: boolean;
@@ -171,9 +172,22 @@ export function ConsultationModal({ isOpen, onClose }: ConsultationModalProps) {
   const nextStep = () => setStep(prev => Math.min(prev + 1, 4));
   const prevStep = () => setStep(prev => Math.max(prev - 1, 1));
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+
+    try {
+      await apiService.submitConsultation({
+        name: formData.name,
+        email: formData.email,
+        phone: formData.phone,
+        company_name: formData.company,
+        services: formData.services,
+        message: formData.message
+      });
+    } catch (err) {
+      console.warn('API post error:', err);
+    }
 
     // Save directly to DataContext for live Admin Panel sync
     addConsultation({
@@ -191,25 +205,23 @@ export function ConsultationModal({ isOpen, onClose }: ConsultationModalProps) {
       services: formData.services.length > 0 ? formData.services : ['General Inquiry']
     });
 
-    setTimeout(() => {
-      setIsSubmitting(false);
-      setIsSubmitted(true);
+    setIsSubmitting(false);
+    setIsSubmitted(true);
 
-      // Trigger real system notification
-      pushSystemNotification({
-        titleEn: `Consultation Booked: ${formData.name}`,
-        titleAr: `جلسة استشارية مؤكدة: ${formData.name}`,
-        messageEn: `Consultation request from ${formData.name} was logged successfully.`,
-        messageAr: `تم تسجيل طلب استشارة من ${formData.name} بنجاح.`,
-        category: 'consultation',
-        metadata: {
-          name: formData.name,
-          email: formData.email,
-          services: formData.services.length > 0 ? formData.services : ['General Inquiry'],
-          severity: 'success'
-        }
-      });
-    }, 1000);
+    // Trigger real system notification
+    pushSystemNotification({
+      titleEn: `Consultation Booked: ${formData.name}`,
+      titleAr: `جلسة استشارية مؤكدة: ${formData.name}`,
+      messageEn: `Consultation request from ${formData.name} was logged successfully.`,
+      messageAr: `تم تسجيل طلب استشارة من ${formData.name} بنجاح.`,
+      category: 'consultation',
+      metadata: {
+        name: formData.name,
+        email: formData.email,
+        services: formData.services.length > 0 ? formData.services : ['General Inquiry'],
+        severity: 'success'
+      }
+    });
   };
 
   const resetForm = () => {

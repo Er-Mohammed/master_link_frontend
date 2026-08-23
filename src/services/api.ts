@@ -8,7 +8,6 @@
  */
 
 import {
-  servicesData,
   projectsData,
   testimonialsData,
   clientLogosData,
@@ -29,7 +28,7 @@ import {
 import type { AdminRole } from '../lib/permissions';
 
 // ─── Base URL ────────────────────────────────────────────────────────
-const RAW_BASE = import.meta.env.VITE_API_BASE_URL || '';
+const RAW_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
 const API_BASE_URL = RAW_BASE.replace(/\/+$/, '');
 
 // ─── Token Storage ───────────────────────────────────────────────────
@@ -324,7 +323,7 @@ export interface LaravelApiResponse<T> {
 
 export function mapLaravelServiceToItem(service: LaravelService): ServiceItem {
   const primaryMedia = service.media && service.media.length > 0 ? service.media[0] : null;
-  const coverImage = primaryMedia?.url || 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=800&q=80';
+  const coverImage = primaryMedia?.url || '';
 
   return {
     id: String(service.id),
@@ -987,6 +986,44 @@ export function mapLaravelProjectToItem(project: LaravelProject): ProjectItemMap
   };
 }
 
+export function mapLaravelProjectToProjectItem(project: any): ProjectItem {
+  const mediaList = Array.isArray(project.media) ? project.media : [];
+  const images = mediaList
+    .map((m: any) => (typeof m === 'string' ? m : (m?.url || m?.file_path || '')))
+    .filter(Boolean);
+
+  const primaryImage = images.length > 0 ? images[0] : '';
+
+  return {
+    id: String(project.id),
+    titleEn: project.title || '',
+    titleAr: project.title || '',
+    nameEn: project.title || '',
+    nameAr: project.title || '',
+    categoryEn: project.category?.name || 'Technical Services',
+    categoryAr: project.category?.name || 'خدماتنا التقنية',
+    descriptionEn: project.short_description || project.full_description || '',
+    descriptionAr: project.short_description || project.full_description || '',
+    fullDescriptionEn: project.full_description || '',
+    fullDescriptionAr: project.full_description || '',
+    image: primaryImage,
+    img: primaryImage,
+    images: images,
+    media: mediaList,
+    clientEn: project.client_name || '',
+    clientAr: project.client_name || '',
+    status: project.is_active ? 'published' : 'hidden',
+    featured: Boolean(project.is_featured),
+    displayOrder: project.sort_order || 0,
+    statsEn: 'High Performance',
+    statsAr: 'أداء ممتاز',
+    tags: Array.isArray(project.services) ? project.services.map((s: any) => s.title || s) : [],
+    services: Array.isArray(project.services) ? project.services.map((s: any) => s.title || s) : [],
+    createdAt: project.created_at,
+    updatedAt: project.updated_at
+  };
+}
+
 export function mapProjectItemToLaravelPayload(item: Partial<ProjectItemMapped>): LaravelProjectPayload {
   return {
     category_id: Number(item.categoryId),
@@ -1005,38 +1042,44 @@ export function mapProjectItemToLaravelPayload(item: Partial<ProjectItemMapped>)
 
 
 
-// ─── Public API Service (unchanged, with local data fallback) ────────
+// ─── Public API Service (Laravel Single Source of Truth) ────────
 export const apiService = {
   // 1. Services
   async getServices(): Promise<ServiceItem[]> {
     if (API_BASE_URL) {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/v1/services`);
+        const res = await fetch(`${API_BASE_URL}/api/services`);
         if (res.ok) {
           const json = await res.json();
-          return json.data || json;
+          const rawItems = json.data || json;
+          if (Array.isArray(rawItems)) {
+            return rawItems.map(mapLaravelServiceToItem);
+          }
         }
       } catch (err) {
-        console.warn('Fallback to local services data:', err);
+        console.warn('Failed to load public services from API:', err);
       }
     }
-    return servicesData;
+    return [];
   },
 
   // 2. Projects & Portfolio
   async getProjects(): Promise<ProjectItem[]> {
     if (API_BASE_URL) {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/v1/projects`);
+        const res = await fetch(`${API_BASE_URL}/api/projects`);
         if (res.ok) {
           const json = await res.json();
-          return json.data || json;
+          const rawItems = json.data || json;
+          if (Array.isArray(rawItems)) {
+            return rawItems.map(mapLaravelProjectToProjectItem);
+          }
         }
       } catch (err) {
-        console.warn('Fallback to local projects data:', err);
+        console.warn('Failed to load public projects from API:', err);
       }
     }
-    return projectsData;
+    return [];
   },
 
   // 3. Testimonials & Reviews
@@ -1059,13 +1102,30 @@ export const apiService = {
   async getClientLogos(): Promise<ClientLogo[]> {
     if (API_BASE_URL) {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/v1/clients`);
+        const res = await fetch(`${API_BASE_URL}/api/client-logos`);
         if (res.ok) {
           const json = await res.json();
-          return json.data || json;
+          const rawItems = json.data || json;
+          if (Array.isArray(rawItems)) {
+            return rawItems.map((logo: any) => ({
+              id: String(logo.id),
+              media_id: String(logo.media_id || (logo.media ? logo.media.id : '')),
+              company_name: logo.company_name || '',
+              website_url: logo.website_url || null,
+              sort_order: logo.sort_order ?? 0,
+              is_active: logo.is_active !== undefined ? Boolean(logo.is_active) : true,
+              created_at: logo.created_at || new Date().toISOString(),
+              updated_at: logo.updated_at || new Date().toISOString(),
+              media: logo.media ? {
+                id: String(logo.media.id),
+                file_path: logo.media.url || logo.media.file_path || '',
+                url: logo.media.url || logo.media.file_path || ''
+              } : null
+            }));
+          }
         }
       } catch (err) {
-        console.warn('Fallback to local client logos:', err);
+        console.warn('Failed to load public client logos from API:', err);
       }
     }
     return clientLogosData;
@@ -1097,10 +1157,10 @@ export const apiService = {
   },
 
   // 7. Submit Consultation Booking Request
-  async submitConsultation(payload: Partial<ConsultationItem>): Promise<{ success: boolean; id?: string }> {
+  async submitConsultation(payload: any): Promise<{ success: boolean; id?: string }> {
     if (API_BASE_URL) {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/v1/consultations`, {
+        const res = await fetch(`${API_BASE_URL}/api/consultations`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)

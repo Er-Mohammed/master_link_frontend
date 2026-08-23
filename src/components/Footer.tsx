@@ -76,10 +76,10 @@ export function Footer() {
           
           {/* Col 1: Socials & Brand */}
           <div className={`lg:col-span-4 space-y-6 ${isRtl ? 'text-right' : 'text-left'}`}>
-            <Logo 
-              variant="light"
-              className="h-16 sm:h-20 md:h-24" 
-              imgClassName="h-16 sm:h-20 md:h-24 w-auto object-contain transition-all duration-300 drop-shadow-sm"
+            <Logo
+              variant="footer"
+              className="h-20 sm:h-24 md:h-28 max-w-[280px]"
+              imgClassName="h-full w-auto max-w-full object-contain transition-all duration-300 drop-shadow-sm"
             />
             <p className="text-xs text-slate-600 font-normal leading-relaxed max-w-sm">
               {aboutText || t.footerAbout}

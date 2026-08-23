@@ -1,51 +1,93 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useData } from '../context/DataContext';
 import logoWhite from '../assets/masterlink-logo-white.svg';
 import logoDark from '../assets/masterlink-logo.svg';
 
 interface LogoProps {
-  variant?: 'header' | 'footer' | 'light' | 'white';
+  variant?: 'header' | 'footer' | 'admin' | 'login' | 'light' | 'white';
   className?: string;
   imgClassName?: string;
-  span1Style?: React.CSSProperties;
-  span2Style?: React.CSSProperties;
+  alt?: string;
+}
+
+export function resolveMediaUrl(url?: string | null): string {
+  if (!url || typeof url !== 'string') return '';
+  const trimmed = url.trim();
+  if (!trimmed) return '';
+
+  // If already absolute URL or data URI
+  if (/^(http|https|data):/i.test(trimmed)) {
+    return trimmed;
+  }
+
+  // Handle relative server paths like /storage/... or storage/...
+  const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
+  const cleanBase = apiBase.replace(/\/+$/, '');
+  const cleanPath = trimmed.startsWith('/') ? trimmed : `/${trimmed}`;
+
+  return `${cleanBase}${cleanPath}`;
 }
 
 export function Logo({ 
   variant = 'header',
   className = "",
-  imgClassName = ""
+  imgClassName = "",
+  alt
 }: LogoProps) {
   const { settings } = useData();
 
-  // If a custom company logo is uploaded in dashboard settings, use it. Otherwise use the primary official logo asset.
-  const customLogo = settings?.siteLogo || settings?.companyLogo;
-  const isLight = variant === 'light';
+  // Priority: settings.siteLogo -> settings.companyLogo -> defaultAsset fallback
+  const rawCustomLogo = settings?.siteLogo || settings?.companyLogo;
+  const resolvedCustomLogo = resolveMediaUrl(rawCustomLogo);
   
-  // Use Vite imported asset as primary source, with direct fallback
+  const isLight = variant === 'light' || variant === 'header' || variant === 'admin' || variant === 'login';
   const defaultAsset = isLight ? logoDark : logoWhite;
-  const logoSrc = (customLogo && customLogo.trim() !== '') ? customLogo : defaultAsset;
+
+  const [imgSrc, setImgSrc] = useState<string>(resolvedCustomLogo || defaultAsset);
+  const [hasError, setHasError] = useState<boolean>(false);
+
+  useEffect(() => {
+    const newSrc = resolveMediaUrl(settings?.siteLogo || settings?.companyLogo);
+    if (newSrc) {
+      setImgSrc(newSrc);
+      setHasError(false);
+    } else {
+      setImgSrc(defaultAsset);
+      setHasError(false);
+    }
+  }, [settings?.siteLogo, settings?.companyLogo, defaultAsset]);
+
+  const handleImageError = () => {
+    if (!hasError && imgSrc !== defaultAsset) {
+      setHasError(true);
+      setImgSrc(defaultAsset);
+    }
+  };
+
+  let sizeClasses = "h-11 sm:h-13 md:h-16"; // Public Header size (approx 44px-64px)
+  if (variant === 'footer') {
+    sizeClasses = "h-20 sm:h-24 md:h-28"; // Public Footer size (approx 80px-112px)
+  } else if (variant === 'login') {
+    sizeClasses = "h-20 sm:h-24 md:h-28"; // Login card logo size (approx 80px-112px)
+  } else if (variant === 'admin') {
+    sizeClasses = "h-12 sm:h-14"; // Admin Header / Sidebar size (approx 48px-56px)
+  }
+
+  const siteName = alt || settings?.siteName || settings?.companyNameEn || "Master Link";
 
   return (
     <div 
-      className={`inline-flex items-center justify-center shrink-0 select-none notranslate ${className}`}
+      className={`inline-flex items-center justify-center shrink-0 select-none notranslate ${sizeClasses} ${className}`}
       dir="ltr"
       translate="no"
     >
-      <img 
-        src={logoSrc} 
-        alt={settings?.siteName || settings?.companyNameEn || "Master Link"} 
-        className={`max-h-full max-w-full w-auto object-contain transition-all duration-300 drop-shadow-sm ${imgClassName}`}
+      <img
+        src={imgSrc}
+        alt={siteName}
+        className={`h-full w-auto max-h-full max-w-full object-contain transition-all duration-300 drop-shadow-sm ${imgClassName}`}
         loading="eager"
         decoding="async"
-        onError={(e) => {
-          // Fallback if dynamic URL fails to resolve
-          const target = e.target as HTMLImageElement;
-          const fallback = isLight ? logoDark : logoWhite;
-          if (target.src !== fallback) {
-            target.src = fallback;
-          }
-        }}
+        onError={handleImageError}
       />
     </div>
   );

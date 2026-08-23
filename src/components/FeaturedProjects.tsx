@@ -1,6 +1,5 @@
 import React, { useState } from 'react';
-import { Project } from '../types';
-import { ArrowUpRight, ArrowUpLeft, Filter, Target, Zap, ShieldAlert, Sparkles, X, Check } from 'lucide-react';
+import { ArrowUpRight, ArrowUpLeft, Target, Zap, Sparkles, X, Check, Image as ImageIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLanguage } from '../context/LanguageContext';
 import { useData } from '../context/DataContext';
@@ -12,6 +11,7 @@ interface FeaturedProjectsProps {
 export function FeaturedProjects({ onOpenConsultation }: FeaturedProjectsProps) {
   const [activeCategory, setActiveCategory] = useState('All');
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
+  const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
   const { t, isRtl, language } = useLanguage();
   const { projects: cmsProjects, services: cmsServices } = useData();
 
@@ -26,8 +26,8 @@ export function FeaturedProjects({ onOpenConsultation }: FeaturedProjectsProps) 
     { key: 'AI Production', id: 'ai-production', nameEn: 'AI Production', nameAr: 'الإنتاج بالذكاء الاصطناعي', label: isRtl ? 'الإنتاج بالذكاء الاصطناعي' : 'AI Production' }
   ];
 
-  // Dynamically pull extra categories present in CMS published projects & database services
-  const publishedCmsProjects = cmsProjects.filter(p => p.status === 'published');
+  // Filter published active projects from CMS / Laravel DB
+  const publishedCmsProjects = cmsProjects.filter(p => p.status === 'published' || (p as any).isActive !== false);
 
   const dynamicCategories = React.useMemo(() => {
     const list = [...baseCategories];
@@ -57,36 +57,36 @@ export function FeaturedProjects({ onOpenConsultation }: FeaturedProjectsProps) 
     return list;
   }, [cmsProjects, cmsServices, isRtl]);
 
-  // Map CMS published projects or fallback to static translations
-  const formattedProjects = publishedCmsProjects.length > 0
-    ? publishedCmsProjects.map(p => ({
-        id: p.id,
-        title: (language === 'ar' ? (p.titleAr || p.nameAr) : (p.titleEn || p.nameEn)) || '',
-        category: (language === 'ar' ? p.categoryAr : p.categoryEn) || p.categoryAr || p.categoryEn || '',
-        categoryEn: p.categoryEn || '',
-        categoryAr: p.categoryAr || '',
-        description: (language === 'ar' ? p.descriptionAr : p.descriptionEn) || '',
-        image: p.image || p.img || 'https://images.unsplash.com/photo-1559526324-4b87b5e36e44?auto=format&fit=crop&w=1200&q=80',
-        stats: {
-          label: language === 'ar' ? 'إنجاز' : 'Metric',
-          value: (language === 'ar' ? p.statsAr : p.statsEn) || (language === 'ar' ? 'أداء ممتاز' : 'High Performance')
-        },
-        tags: p.tags || p.services || [],
-        challenge: language === 'ar' ? 'تحقيق أعلى مستويات الأمان والأداء السلس للمستخدمين.' : 'Achieving peak performance, responsive design, and high security.',
-        strategy: language === 'ar' ? 'تصميم بنية برمجية متطورة باستخدام أحدث إطارات العمل.' : 'Engineered bespoke frontend and backend architecture.',
-        results: (language === 'ar' ? p.statsAr : p.statsEn) || ''
-      }))
-    : t.projects.map(p => ({
-        ...p,
-        categoryEn: p.category,
-        categoryAr: p.category,
-        image: p.id === 'apex-identity' ? 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80' :
-               p.id === 'nova-platform' ? 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?auto=format&fit=crop&w=1200&q=80' :
-               p.id === 'aurora-wellness' ? 'https://images.unsplash.com/photo-1551650975-87deedd944c3?auto=format&fit=crop&w=1200&q=80' :
-               'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1200&q=80'
-      }));
+  // Map CMS published projects cleanly from database without mock unsplash fallback images
+  const formattedProjects = publishedCmsProjects.map(p => {
+    const projectImages = (p.images && p.images.length > 0)
+      ? p.images
+      : ((p.image || p.img) ? [p.image || p.img || ''] : []);
 
-  // Robust database-integrated category filter matching logic
+    const primaryImage = projectImages.length > 0 ? projectImages[0] : (p.image || p.img || '');
+
+    return {
+      id: p.id,
+      title: (language === 'ar' ? (p.titleAr || p.nameAr) : (p.titleEn || p.nameEn)) || '',
+      category: (language === 'ar' ? p.categoryAr : p.categoryEn) || p.categoryAr || p.categoryEn || '',
+      categoryEn: p.categoryEn || '',
+      categoryAr: p.categoryAr || '',
+      description: (language === 'ar' ? p.descriptionAr : p.descriptionEn) || '',
+      fullDescription: (language === 'ar' ? (p.fullDescriptionAr || p.descriptionAr) : (p.fullDescriptionEn || p.descriptionEn)) || '',
+      image: primaryImage,
+      images: projectImages,
+      stats: {
+        label: language === 'ar' ? 'إنجاز' : 'Metric',
+        value: (language === 'ar' ? p.statsAr : p.statsEn) || (language === 'ar' ? 'أداء ممتاز' : 'High Performance')
+      },
+      tags: p.tags || p.services || [],
+      challenge: language === 'ar' ? 'تحقيق أعلى مستويات الأمان والأداء السلس للمستخدمين.' : 'Achieving peak performance, responsive design, and high security.',
+      strategy: language === 'ar' ? 'تصميم بنية برمجية متطورة باستخدام أحدث إطارات العمل.' : 'Engineered bespoke frontend and backend architecture.',
+      results: (language === 'ar' ? p.statsAr : p.statsEn) || ''
+    };
+  });
+
+  // Category filter matching logic
   const filteredProjects = React.useMemo(() => {
     if (activeCategory === 'All' || activeCategory === 'all') {
       return formattedProjects;
@@ -104,7 +104,6 @@ export function FeaturedProjects({ onOpenConsultation }: FeaturedProjectsProps) 
       const targetNameAr = (selectedCatObj?.nameAr || '').toLowerCase();
       const targetLabel = (selectedCatObj?.label || '').toLowerCase();
 
-      // Check for direct match or tag match
       return (
         pCatEn === targetKey ||
         pCatAr === targetKey ||
@@ -119,6 +118,12 @@ export function FeaturedProjects({ onOpenConsultation }: FeaturedProjectsProps) 
   }, [activeCategory, formattedProjects, dynamicCategories]);
 
   const selectedProject = formattedProjects.find(p => p.id === selectedProjectId);
+
+  const activeModalImage = selectedProject
+    ? (selectedProject.images && selectedProject.images.length > 0
+        ? selectedProject.images[selectedImageIndex] || selectedProject.images[0]
+        : selectedProject.image)
+    : '';
 
   const resultsList = selectedProject?.results
     ? selectedProject.results.split('.').map(s => s.trim()).filter(Boolean)
@@ -169,82 +174,120 @@ export function FeaturedProjects({ onOpenConsultation }: FeaturedProjectsProps) 
         </motion.div>
 
         {/* Portfolio Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          <AnimatePresence mode="popLayout">
-            {filteredProjects.map((project, index) => (
-              <motion.div
-                key={project.id}
-                layout
-                initial={{ opacity: 0, y: 35, scale: 0.96 }}
-                animate={{ opacity: 1, y: 0, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                whileHover={{ y: -8 }}
-                transition={{ duration: 0.45, delay: index * 0.08, ease: [0.16, 1, 0.3, 1] }}
-                className="group cursor-pointer bg-white rounded-3xl border border-[#E5E7EB] overflow-hidden shadow-sm hover:shadow-2xl hover:shadow-[#5683FC]/15 hover:border-[#5683FC]/50 transition-all duration-300 relative"
-                onClick={() => setSelectedProjectId(project.id)}
-              >
-                {/* Image Container with premium Hover Motion & Enlarged Scale */}
-                <div className="relative aspect-[16/9] sm:aspect-[16/9.5] overflow-hidden bg-slate-100 border-b border-[#E5E7EB]">
-                  <motion.img
-                    src={project.image}
-                    alt={project.title}
-                    referrerPolicy="no-referrer"
-                    className="object-cover w-full h-full scale-105 group-hover:scale-120"
-                    transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                  />
-                  {/* Category Tag */}
-                  <div className={`absolute top-4 ${isRtl ? 'right-4' : 'left-4'}`}>
-                    <span className="px-3 py-1 bg-white/95 backdrop-blur-md text-[#111827] font-bold rounded-full text-[10px] tracking-wide border border-white shadow-sm uppercase">
-                      {project.category}
-                    </span>
-                  </div>
-                  {/* Statistics overlay */}
-                  <div className={`absolute bottom-4 ${isRtl ? 'left-4' : 'right-4'}`}>
-                    <div className="bg-[#0F172A]/85 backdrop-blur-sm text-white px-3.5 py-1.5 rounded-2xl border border-white/10 flex items-center gap-1.5 shadow-md">
-                      <div className="w-1.5 h-1.5 rounded-full bg-[#2EDFF2]" />
-                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-300">{project.stats.label}:</span>
-                      <span className="text-xs font-extrabold font-mono text-[#2EDFF2]">{project.stats.value}</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Info Container */}
-                <div className={`p-6 md:p-8 space-y-4 ${isRtl ? 'text-right' : 'text-left'}`}>
-                  <div className="space-y-1.5">
-                    <h3 className="text-xl font-extrabold text-[#111827] tracking-tight group-hover:text-[#F20530] transition-colors">
-                      {project.title}
-                    </h3>
-                    <p className="text-xs sm:text-sm text-[#6B7280] leading-relaxed font-normal">
-                      {project.description}
-                    </p>
-                  </div>
-
-                  {/* Tags & Action Row */}
-                  <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-[#E5E7EB]">
-                    <div className="flex flex-wrap gap-1">
-                      {project.tags.map(tag => (
-                        <span key={tag} className="px-2.5 py-1 bg-[#F5F9FF] text-[#5683FC] border border-[#BFDDF7]/40 rounded-lg text-[9px] font-bold">
-                          {tag}
+        {filteredProjects.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <AnimatePresence mode="popLayout">
+              {filteredProjects.map((project, index) => (
+                <motion.div
+                  key={project.id}
+                  layout
+                  initial={{ opacity: 0, y: 35, scale: 0.96 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  whileHover={{ y: -8 }}
+                  transition={{ duration: 0.45, delay: index * 0.08, ease: [0.16, 1, 0.3, 1] }}
+                  className="group cursor-pointer bg-white rounded-3xl border border-[#E5E7EB] overflow-hidden shadow-sm hover:shadow-2xl hover:shadow-[#5683FC]/15 hover:border-[#5683FC]/50 transition-all duration-300 relative"
+                  onClick={() => {
+                    setSelectedProjectId(project.id);
+                    setSelectedImageIndex(0);
+                  }}
+                >
+                  {/* Image Container */}
+                  <div className="relative aspect-[16/9] sm:aspect-[16/9.5] overflow-hidden bg-slate-100 border-b border-[#E5E7EB]">
+                    {project.image ? (
+                      <motion.img
+                        src={project.image}
+                        alt={project.title}
+                        referrerPolicy="no-referrer"
+                        className="object-cover w-full h-full scale-105 group-hover:scale-120"
+                        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                      />
+                    ) : (
+                      <div className="w-full h-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 flex flex-col items-center justify-center p-4 relative overflow-hidden">
+                        <div className="absolute inset-0 bg-gradient-to-tr from-[#5683FC]/20 via-[#F20530]/10 to-transparent opacity-60 pointer-events-none" />
+                        <ImageIcon className="w-10 h-10 text-slate-500 mb-2 relative z-10" />
+                        <span className="text-xs font-bold text-slate-400 relative z-10 text-center">
+                          {isRtl ? 'مشروع بدون صور' : 'No Images Available'}
                         </span>
-                      ))}
+                      </div>
+                    )}
+
+                    {/* Category Tag */}
+                    <div className={`absolute top-4 ${isRtl ? 'right-4' : 'left-4'}`}>
+                      <span className="px-3 py-1 bg-white/95 backdrop-blur-md text-[#111827] font-bold rounded-full text-[10px] tracking-wide border border-white shadow-sm uppercase">
+                        {project.category}
+                      </span>
                     </div>
-                    <button
-                      id={`view-study-btn-${project.id}`}
-                      className="inline-flex items-center gap-1 text-xs font-bold text-[#F20530] group-hover:text-[#5683FC] transition-colors cursor-pointer"
-                    >
-                      {t.portfolioViewCase}
-                      {isRtl ? (
-                        <ArrowUpLeft className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5 group-hover:-translate-y-0.5" />
-                      ) : (
-                        <ArrowUpRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
-                      )}
-                    </button>
+
+                    {/* Gallery Count Pill */}
+                    {project.images && project.images.length > 1 && (
+                      <div className={`absolute top-4 ${isRtl ? 'left-4' : 'right-4'}`}>
+                        <span className="px-2.5 py-1 bg-slate-900/85 backdrop-blur-md text-white font-mono font-bold rounded-full text-[10px] tracking-wide border border-white/20 shadow-sm flex items-center gap-1">
+                          <ImageIcon className="w-3 h-3 text-[#2EDFF2]" />
+                          {project.images.length} {isRtl ? 'صور' : 'Photos'}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Statistics overlay */}
+                    <div className={`absolute bottom-4 ${isRtl ? 'left-4' : 'right-4'}`}>
+                      <div className="bg-[#0F172A]/85 backdrop-blur-sm text-white px-3.5 py-1.5 rounded-2xl border border-white/10 flex items-center gap-1.5 shadow-md">
+                        <div className="w-1.5 h-1.5 rounded-full bg-[#2EDFF2]" />
+                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-300">{project.stats.label}:</span>
+                        <span className="text-xs font-extrabold font-mono text-[#2EDFF2]">{project.stats.value}</span>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </motion.div>
-            ))}
-          </AnimatePresence>
-        </div>
+
+                  {/* Info Container */}
+                  <div className={`p-6 md:p-8 space-y-4 ${isRtl ? 'text-right' : 'text-left'}`}>
+                    <div className="space-y-1.5">
+                      <h3 className="text-xl font-extrabold text-[#111827] tracking-tight group-hover:text-[#F20530] transition-colors">
+                        {project.title}
+                      </h3>
+                      <p className="text-xs sm:text-sm text-[#6B7280] leading-relaxed font-normal">
+                        {project.description}
+                      </p>
+                    </div>
+
+                    {/* Tags & Action Row */}
+                    <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-[#E5E7EB]">
+                      <div className="flex flex-wrap gap-1">
+                        {project.tags.map(tag => (
+                          <span key={tag} className="px-2.5 py-1 bg-[#F5F9FF] text-[#5683FC] border border-[#BFDDF7]/40 rounded-lg text-[9px] font-bold">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                      <button
+                        id={`view-study-btn-${project.id}`}
+                        className="inline-flex items-center gap-1 text-xs font-bold text-[#F20530] group-hover:text-[#5683FC] transition-colors cursor-pointer"
+                      >
+                        {t.portfolioViewCase}
+                        {isRtl ? (
+                          <ArrowUpLeft className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5 group-hover:-translate-y-0.5" />
+                        ) : (
+                          <ArrowUpRight className="w-3.5 h-3.5 transition-transform group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </AnimatePresence>
+          </div>
+        ) : (
+          /* Empty State when no projects match filter */
+          <div className="text-center py-16 px-4 bg-slate-50 border border-slate-200 rounded-3xl max-w-xl mx-auto space-y-3">
+            <ImageIcon className="w-12 h-12 text-slate-400 mx-auto" />
+            <h4 className="text-lg font-bold text-slate-800">
+              {isRtl ? 'لا توجد مشاريع مضافة في هذا القسم' : 'No Projects Found in This Category'}
+            </h4>
+            <p className="text-xs text-slate-500 max-w-md mx-auto">
+              {isRtl ? 'يمكنك استعراض الأقسام الأخرى أو التواصل معنا لاستشارات مخصصة.' : 'Please explore other categories or contact us for custom consultations.'}
+            </p>
+          </div>
+        )}
 
       </div>
 
@@ -261,36 +304,70 @@ export function FeaturedProjects({ onOpenConsultation }: FeaturedProjectsProps) 
               initial={{ opacity: 0, scale: 0.96 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.96 }}
-              className="bg-white border border-slate-100 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl relative"
+              className="bg-white border border-slate-100 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl relative max-h-[90vh] flex flex-col"
             >
-              {/* Cover Image */}
-              <div className="h-64 sm:h-72 overflow-hidden relative">
-                <img
-                  src={selectedProject.image}
-                  alt={selectedProject.title}
-                  referrerPolicy="no-referrer"
-                  className="object-cover w-full h-full scale-105"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent" />
+              {/* Cover Image & Active Photo Showcase */}
+              <div className="h-64 sm:h-72 overflow-hidden relative shrink-0 bg-slate-900">
+                {activeModalImage ? (
+                  <img
+                    src={activeModalImage}
+                    alt={selectedProject.title}
+                    referrerPolicy="no-referrer"
+                    className="object-cover w-full h-full scale-105 transition-all duration-500"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-gradient-to-br from-slate-900 to-slate-950 flex flex-col items-center justify-center p-4">
+                    <ImageIcon className="w-12 h-12 text-slate-600 mb-2" />
+                    <span className="text-xs font-bold text-slate-400">
+                      {isRtl ? 'لا توجد صور لهذا المشروع' : 'No Media Uploaded'}
+                    </span>
+                  </div>
+                )}
+                <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/20 to-transparent pointer-events-none" />
                 <button
                   id="close-case-study-btn"
                   onClick={() => setSelectedProjectId(null)}
-                  className={`absolute top-4 ${isRtl ? 'left-4' : 'right-4'} p-1.5 bg-black/40 hover:bg-black/60 text-white rounded-full transition-colors border border-white/10`}
+                  className={`absolute top-4 ${isRtl ? 'left-4' : 'right-4'} p-1.5 bg-black/50 hover:bg-black/80 text-white rounded-full transition-colors border border-white/20 cursor-pointer z-20`}
                 >
                   <X className="w-5 h-5" />
                 </button>
-                <div className={`absolute bottom-4 ${isRtl ? 'right-6 text-right' : 'left-6 text-left'}`}>
-                  <span className="text-[9px] font-bold uppercase tracking-widest text-rose-400 bg-rose-950/40 border border-rose-500/30 px-2 py-0.5 rounded-full mb-1 inline-block">
+
+                <div className={`absolute bottom-4 ${isRtl ? 'right-6 text-right' : 'left-6 text-left'} z-10 max-w-[85%]`}>
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-rose-400 bg-rose-950/60 border border-rose-500/40 px-2.5 py-0.5 rounded-full mb-1 inline-block">
                     {selectedProject.category}
                   </span>
-                  <h4 className="text-xl md:text-2xl font-bold text-white tracking-tight">
+                  <h4 className="text-xl md:text-2xl font-bold text-white tracking-tight leading-snug">
                     {selectedProject.title}
                   </h4>
                 </div>
               </div>
 
+              {/* Multi-Image Gallery Bar (if project has more than 1 image) */}
+              {selectedProject.images && selectedProject.images.length > 1 && (
+                <div className="px-4 py-2.5 bg-slate-950 border-b border-slate-800 flex items-center gap-2 overflow-x-auto shrink-0">
+                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">
+                    {isRtl ? 'الصور (' + selectedProject.images.length + '):' : 'Gallery (' + selectedProject.images.length + '):'}
+                  </span>
+                  <div className="flex items-center gap-2 overflow-x-auto py-0.5">
+                    {selectedProject.images.map((imgUrl, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => setSelectedImageIndex(idx)}
+                        className={`relative w-14 h-10 rounded-lg overflow-hidden shrink-0 border-2 transition-all cursor-pointer ${
+                          selectedImageIndex === idx
+                            ? 'border-[#F20530] scale-105 shadow-md shadow-[#F20530]/40 opacity-100 ring-2 ring-[#F20530]/20'
+                            : 'border-slate-700 opacity-55 hover:opacity-100 hover:scale-102'
+                        }`}
+                      >
+                        <img src={imgUrl} alt={`${selectedProject.title} ${idx + 1}`} className="w-full h-full object-cover" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Case Study details */}
-              <div className={`p-6 md:p-8 space-y-6 overflow-y-auto max-h-[60vh] ${isRtl ? 'text-right' : 'text-left'}`}>
+              <div className={`p-6 md:p-8 space-y-6 overflow-y-auto flex-1 ${isRtl ? 'text-right' : 'text-left'}`}>
                 
                 {/* Challenge & Strategy */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -331,21 +408,23 @@ export function FeaturedProjects({ onOpenConsultation }: FeaturedProjectsProps) 
                 </div>
 
                 {/* Tags */}
-                <div className="flex flex-wrap gap-1 pt-2 border-t border-slate-100">
-                  {(selectedProject.tags || []).map(tag => (
-                    <span key={tag} className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded text-[9px] font-bold">
-                      {tag}
-                    </span>
-                  ))}
-                </div>
+                {selectedProject.tags && selectedProject.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 pt-2 border-t border-slate-100">
+                    {selectedProject.tags.map(tag => (
+                      <span key={tag} className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded text-[9px] font-bold">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Footer */}
-              <div className={`px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex ${isRtl ? 'justify-start' : 'justify-end'}`}>
+              <div className={`px-6 py-4 border-t border-slate-100 bg-slate-50/50 flex shrink-0 ${isRtl ? 'justify-start' : 'justify-end'}`}>
                 <button
                   id="case-study-close-footer-btn"
                   onClick={() => setSelectedProjectId(null)}
-                  className="px-5 py-2 text-xs font-bold text-slate-700 hover:text-slate-900 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all shadow-sm"
+                  className="px-5 py-2 text-xs font-bold text-slate-700 hover:text-slate-900 bg-white border border-slate-200 rounded-xl hover:bg-slate-50 transition-all shadow-sm cursor-pointer"
                 >
                   {t.caseStudyClose}
                 </button>

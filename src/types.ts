@@ -216,6 +216,7 @@ export interface ProjectItem {
   status: 'published' | 'draft' | 'archived' | 'hidden';
   displayOrder?: number;
   images?: string[];
+  media?: any[];
   metaTitleEn?: string;
   metaTitleAr?: string;
   metaDescEn?: string;

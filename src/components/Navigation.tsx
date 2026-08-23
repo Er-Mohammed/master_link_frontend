@@ -82,26 +82,24 @@ export function Navigation({ onOpenConsultation }: NavigationProps) {
             : 'bg-white/85 border-white/70 shadow-slate-900/5'
         }`}
       >
-        {/* 1. Left Grid Column: Brand Logo inside transparent normal div */}
+        {/* 1. Left Column: Brand Logo */}
         <div className="flex justify-start items-center">
           <a 
             href="#home" 
             onClick={(e) => handleLinkClick(e, '#home')} 
             className="group hover:opacity-95 transition-all flex items-center shrink-0 pl-1 sm:pl-2"
           >
-            <div className="flex items-center justify-start h-10 sm:h-11 md:h-12 w-32 sm:w-36 md:w-44">
-              <Logo 
-                variant="light" 
-                className="h-full w-auto justify-start"
-                imgClassName="h-full w-auto object-contain transition-all duration-300 drop-shadow-sm scale-135 sm:scale-145 md:scale-150 origin-left group-hover:scale-[1.6]" 
-              />
-            </div>
+            <Logo
+              variant="header"
+              className="h-10 sm:h-12 md:h-14 max-w-[180px] sm:max-w-[200px] justify-start"
+              imgClassName="h-full w-auto max-w-full object-contain transition-all duration-300 drop-shadow-sm group-hover:scale-105"
+            />
           </a>
         </div>
 
-        {/* 2. Center Grid Column: Centered Navigation Menu Pill */}
+        {/* 2. Center Column: Navigation Menu Pill (Desktop) */}
         <nav className="hidden md:flex items-center justify-center">
-          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-slate-100/90 border border-slate-200/80 backdrop-blur-md shadow-inner shadow-slate-900/5">
+          <div className="flex items-center gap-1 px-2.5 py-1.5 rounded-full bg-slate-100/90 border border-slate-200/80 backdrop-blur-md shadow-inner shadow-slate-900/5">
             {navLinks.map((link) => {
               const isActive = activeSection === link.href;
               return (
@@ -109,7 +107,7 @@ export function Navigation({ onOpenConsultation }: NavigationProps) {
                   key={link.name}
                   href={link.href}
                   onClick={(e) => handleLinkClick(e, link.href, link.isRoute)}
-                  className={`relative px-4 py-2 rounded-full text-xs lg:text-sm font-extrabold transition-all duration-300 ${
+                  className={`relative px-3.5 py-1.5 rounded-full text-xs lg:text-sm font-extrabold transition-all duration-300 ${
                     isActive 
                       ? 'text-blue-600 bg-white shadow-sm shadow-slate-900/10' 
                       : 'text-slate-700 hover:text-blue-600 hover:bg-white/80'
@@ -131,19 +129,28 @@ export function Navigation({ onOpenConsultation }: NavigationProps) {
           </div>
         </nav>
 
-        {/* 3. Right Grid Column: Language Switcher & Controls */}
-        <div className="flex justify-end items-center gap-3">
+        {/* 3. Right Column: Controls & CTA */}
+        <div className="flex justify-end items-center gap-2 sm:gap-3">
           {/* Desktop Language Switcher */}
           <button
             onClick={toggleLanguage}
-            className="hidden md:flex items-center gap-2 px-4 py-2 rounded-full text-xs font-black text-slate-700 bg-slate-100 hover:bg-slate-200/80 border border-slate-200/80 hover:border-blue-300 transition-all duration-300 shadow-sm shadow-slate-900/5 cursor-pointer active:scale-[0.97]"
+            className="hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-black text-slate-700 bg-slate-100 hover:bg-slate-200/80 border border-slate-200/80 hover:border-blue-300 transition-all duration-300 shadow-sm shadow-slate-900/5 cursor-pointer active:scale-[0.97]"
           >
-            <Globe className="w-4 h-4 text-blue-600" />
+            <Globe className="w-3.5 h-3.5 text-blue-600" />
             <span className="tracking-wider">{language === 'en' ? 'العربية' : 'English'}</span>
           </button>
 
-          {/* Mobile Menu Toggle & Lang Button */}
-          <div className="flex md:hidden items-center gap-2">
+          {/* Consultation Button (Desktop) */}
+          <button
+            onClick={onOpenConsultation}
+            className="hidden sm:inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-full bg-[#F20530] hover:bg-rose-600 text-white text-xs font-black transition-all duration-300 shadow-md shadow-rose-500/20 active:scale-95 cursor-pointer"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>{isRtl ? 'طلب استشارة' : 'Book Consultation'}</span>
+          </button>
+
+          {/* Mobile Menu Controls */}
+          <div className="flex md:hidden items-center gap-1.5">
             <button
               onClick={toggleLanguage}
               className="p-2 rounded-xl text-slate-700 bg-slate-100 border border-slate-200 hover:bg-slate-200 transition-colors"
@@ -158,13 +165,13 @@ export function Navigation({ onOpenConsultation }: NavigationProps) {
               className="p-2 rounded-xl text-slate-700 bg-slate-100 border border-slate-200 hover:bg-slate-200 transition-colors"
               aria-label="Toggle mobile menu"
             >
-              {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+              {isMobileMenuOpen ? <X className="w-5 h-5 text-rose-600" /> : <Menu className="w-5 h-5 text-slate-800" />}
             </button>
           </div>
         </div>
       </div>
 
-      {/* Mobile Menu Panel (Clean White Frosted Glassmorphism with smooth radius) */}
+      {/* Mobile Menu Drawer Panel */}
       <AnimatePresence>
         {isMobileMenuOpen && (
           <motion.div
@@ -197,16 +204,28 @@ export function Navigation({ onOpenConsultation }: NavigationProps) {
               </div>
 
               <div className="pt-3 border-t border-slate-100 flex flex-col gap-2.5">
+                {/* Mobile Consultation CTA */}
+                <button
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    onOpenConsultation();
+                  }}
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 text-xs font-black text-white bg-[#F20530] hover:bg-rose-600 rounded-xl transition-all shadow-md shadow-rose-500/20 cursor-pointer"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  <span>{isRtl ? 'طلب استشارة مجانية' : 'Book Free Consultation'}</span>
+                </button>
+
                 {/* Mobile Language switch */}
                 <button
                   onClick={() => {
                     toggleLanguage();
                     setIsMobileMenuOpen(false);
                   }}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-3 text-xs font-black text-slate-700 bg-slate-100 hover:bg-slate-200/80 border border-slate-200 rounded-xl transition-all"
+                  className="w-full flex items-center justify-center gap-2 px-4 py-3 text-xs font-black text-slate-700 bg-slate-100 hover:bg-slate-200/80 border border-slate-200 rounded-xl transition-all cursor-pointer"
                 >
                   <Globe className="w-4 h-4 text-blue-600" />
-                  {language === 'en' ? 'تحويل للغة العربية' : 'Switch to English'}
+                  <span>{language === 'en' ? 'تحويل للغة العربية' : 'Switch to English'}</span>
                 </button>
               </div>
             </div>
