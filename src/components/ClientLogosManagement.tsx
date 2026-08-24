@@ -282,12 +282,12 @@ export function ClientLogosManagement() {
 
   // Permanent Delete
   const handleConfirmDelete = async () => {
-    if (!logoToDelete) return;
+    const targetId = logoToDelete.id;
     try {
-      await adminClientLogosApi.delete(logoToDelete.id);
+      await adminClientLogosApi.delete(targetId);
+      setLogos(prev => prev.filter(l => l.id !== targetId));
       triggerToast('تم حذف الشعار بشكل نهائي من قاعدة البيانات.', 'danger');
       setLogoToDelete(null);
-      await fetchLogos();
       if (refreshClientLogos) refreshClientLogos();
     } catch (err: any) {
       if (err?.status === 401) handle401Error();

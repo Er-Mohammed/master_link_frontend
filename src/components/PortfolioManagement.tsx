@@ -210,6 +210,15 @@ export function PortfolioManagement() {
     }
   };
 
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 350);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
   // Fetch Projects from Laravel Backend API
   const fetchProjects = async () => {
     setIsPageLoading(true);
@@ -220,8 +229,8 @@ export function PortfolioManagement() {
         sort: sortBy,
         direction: sortDirection
       };
-      if (searchQuery.trim()) {
-        params.search = searchQuery.trim();
+      if (debouncedSearchQuery.trim()) {
+        params.search = debouncedSearchQuery.trim();
       }
       if (selectedCategory !== 'all') {
         params.category_id = selectedCategory;
@@ -255,7 +264,7 @@ export function PortfolioManagement() {
 
   useEffect(() => {
     fetchProjects();
-  }, [searchQuery, selectedCategory, selectedStatus, sortBy, sortDirection]);
+  }, [debouncedSearchQuery, selectedCategory, selectedStatus, sortBy, sortDirection]);
 
   // Sync Slug auto-generation
   useEffect(() => {
@@ -361,7 +370,7 @@ export function PortfolioManagement() {
 
     try {
       await adminProjectsApi.delete(deleteId);
-      await fetchProjects();
+      setProjects(prev => prev.filter(p => p.id !== deleteId));
       triggerToast('تم حذف المشروع نهائياً من قاعدة البيانات بنجاح.', 'danger');
     } catch (err: any) {
       if (err?.status === 401) handle401Error();

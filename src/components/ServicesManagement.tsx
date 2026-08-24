@@ -69,13 +69,22 @@ export function ServicesManagement() {
     setTimeout(() => setToast(null), 3000);
   };
 
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery);
+
+  useEffect(() => {
+    const handler = setTimeout(() => {
+      setDebouncedSearchQuery(searchQuery);
+    }, 350);
+    return () => clearTimeout(handler);
+  }, [searchQuery]);
+
   // Fetch Services from Laravel API
   const loadServices = useCallback(async () => {
     setIsLoading(true);
     setApiError(null);
     try {
       const res = await adminServicesApi.getAll({
-        search: searchQuery || undefined,
+        search: debouncedSearchQuery || undefined,
         is_active: statusFilter === 'active' ? true : statusFilter === 'hidden' ? false : undefined
       });
       if (res.data) {
@@ -105,7 +114,7 @@ export function ServicesManagement() {
     } finally {
       setIsLoading(false);
     }
-  }, [searchQuery, statusFilter, language]);
+  }, [debouncedSearchQuery, statusFilter, language]);
 
   useEffect(() => {
     loadServices();
@@ -377,16 +386,19 @@ export function ServicesManagement() {
 
             // Attach selected media items
             for (const mediaItem of selectedMediaList) {
-              const numericMediaId = Number(mediaItem.media_id || mediaItem.id);
+              const rawId = mediaItem.media_id || mediaItem.id;
+              const numericMediaId = Number(rawId);
               if (!isNaN(numericMediaId) && numericMediaId > 0) {
                 try {
                   const res = await adminServicesApi.attachMedia(targetServiceId, numericMediaId, mediaItem.sort_order || 0);
                   if (res?.data) {
                     updatedServiceFromApi = mapLaravelServiceToItem(res.data);
                   }
-                } catch {
-                  // ignore pivot errors
+                } catch (attachErr) {
+                  console.error(`Failed to attach media ID ${numericMediaId} to service ID ${targetServiceId}:`, attachErr);
                 }
+              } else {
+                console.warn(`[ServicesManagement] Skipping media attachment for non-numeric media ID: "${rawId}"`);
               }
             }
 
@@ -412,9 +424,9 @@ export function ServicesManagement() {
               }
               return [freshService, ...prev];
             });
+          } else {
+            await loadServices();
           }
-
-          await loadServices();
           if (updatedFields.title) {
             setLastUpdatedText(updatedFields.title);
           }

@@ -50,7 +50,6 @@ interface ServiceEditorProps {
 
 export function ServiceEditor({ serviceId, onClose, onSave, existingService }: ServiceEditorProps) {
   const { isRtl } = useLanguage();
-  const { mediaItems } = useData();
 
   // Page & Save states
   const [isSaving, setIsSaving] = useState(false);
@@ -86,7 +85,40 @@ export function ServiceEditor({ serviceId, onClose, onSave, existingService }: S
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
 
+  // Media Library fetch states
+  const [libraryMediaItems, setLibraryMediaItems] = useState<LaravelMedia[]>([]);
+  const [isLoadingLibrary, setIsLoadingLibrary] = useState<boolean>(false);
+  const [libraryFetchError, setLibraryFetchError] = useState<string | null>(null);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch real media from Laravel API when library modal is opened
+  useEffect(() => {
+    let isMounted = true;
+    if (isMediaLibraryModalOpen) {
+      setIsLoadingLibrary(true);
+      setLibraryFetchError(null);
+      adminMediaApi.getAll({ per_page: 50 })
+        .then(res => {
+          if (isMounted) {
+            setLibraryMediaItems(res?.data || []);
+          }
+        })
+        .catch(err => {
+          if (isMounted) {
+            setLibraryFetchError(err?.message || (isRtl ? 'فشل تحميل وسائط المكتبة من الخادم.' : 'Failed to fetch media library items from server.'));
+          }
+        })
+        .finally(() => {
+          if (isMounted) {
+            setIsLoadingLibrary(false);
+          }
+        });
+    }
+    return () => {
+      isMounted = false;
+    };
+  }, [isMediaLibraryModalOpen, isRtl]);
 
   // Fetch detailed service (including media relation) when editing
   useEffect(() => {
@@ -216,18 +248,18 @@ export function ServiceEditor({ serviceId, onClose, onSave, existingService }: S
     }
   };
 
-  // Select Media from Library
-  const selectMediaFromLibrary = (media: any) => {
+  // Select Media from Library (using real LaravelMedia)
+  const selectMediaFromLibrary = (media: LaravelMedia) => {
     const numericId = String(media.id);
-    const exists = serviceMediaList.some(m => m.media_id === numericId);
+    const exists = serviceMediaList.some(m => String(m.media_id) === numericId);
     if (exists) return;
 
     const isFirst = serviceMediaList.length === 0;
     const newItem: ServiceMediaItem = {
       id: `sm-${media.id}`,
       media_id: numericId,
-      file_path: media.url || media.file_path,
-      file_name: media.file_name || media.name || 'Library Media',
+      file_path: media.url,
+      file_name: media.file_name || `Media ${media.id}`,
       alt_text: media.alt_text || '',
       sort_order: serviceMediaList.length,
       is_primary: isFirst,
@@ -937,23 +969,64 @@ export function ServiceEditor({ serviceId, onClose, onSave, existingService }: S
                   </button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto grid grid-cols-2 sm:grid-cols-4 gap-3 p-1">
-                  {mediaItems.map((media: any) => (
-                    <button
-                      key={media.id}
-                      type="button"
-                      onClick={() => selectMediaFromLibrary(media)}
-                      className="group relative h-28 rounded-xl overflow-hidden border border-slate-200 hover:border-[#F20530] transition-all cursor-pointer bg-slate-900"
-                    >
-                      <img src={media.url || media.file_path} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform opacity-90 group-hover:opacity-100" />
-                      <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                        <Plus className="w-6 h-6 text-white" />
-                      </div>
-                    </button>
-                  ))}
-                  {mediaItems.length === 0 && (
-                    <p className="col-span-full text-center py-8 text-xs font-bold text-slate-400">
-                      {isRtl ? 'لا توجد وسائط مسبقة في المكتبة.' : 'No media items found in library.'}
+                <div className="flex-1 overflow-y-auto min-h-[220px] p-1">
+                  {isLoadingLibrary && (
+                    <div className="flex flex-col items-center justify-center py-12 space-y-3">
+                      <RefreshCw className="w-7 h-7 text-[#F20530] animate-spin" />
+                      <p className="text-xs font-bold text-slate-500">
+                        {isRtl ? 'جاري تحميل وسائط المكتبة من الخادم...' : 'Loading library media from server...'}
+                      </p>
+                    </div>
+                  )}
+
+                  {!isLoadingLibrary && libraryFetchError && (
+                    <div className="p-4 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs font-semibold text-center">
+                      {libraryFetchError}
+                    </div>
+                  )}
+
+                  {!isLoadingLibrary && !libraryFetchError && libraryMediaItems.length > 0 && (
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {libraryMediaItems.map((media) => {
+                        const isSelected = serviceMediaList.some(m => String(m.media_id) === String(media.id));
+                        return (
+                          <button
+                            key={media.id}
+                            type="button"
+                            onClick={() => selectMediaFromLibrary(media)}
+                            disabled={isSelected}
+                            className={`group relative h-32 rounded-xl overflow-hidden border transition-all cursor-pointer bg-slate-900 flex flex-col text-left ${
+                              isSelected ? 'border-emerald-500 ring-2 ring-emerald-500/20 opacity-60 cursor-not-allowed' : 'border-slate-200 hover:border-[#F20530]'
+                            }`}
+                          >
+                            <div className="relative flex-1 w-full overflow-hidden bg-slate-950">
+                              <img
+                                src={media.url}
+                                alt={media.alt_text || media.file_name}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform opacity-90 group-hover:opacity-100"
+                              />
+                              {isSelected ? (
+                                <div className="absolute top-2 right-2 p-1 bg-emerald-500 text-white rounded-full shadow-md">
+                                  <Check className="w-3.5 h-3.5 stroke-[3]" />
+                                </div>
+                              ) : (
+                                <div className="absolute inset-0 bg-slate-950/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+                                  <Plus className="w-6 h-6 text-white" />
+                                </div>
+                              )}
+                            </div>
+                            <div className="p-1.5 bg-slate-900 text-white text-[10px] font-mono truncate w-full px-2">
+                              {media.file_name}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {!isLoadingLibrary && !libraryFetchError && libraryMediaItems.length === 0 && (
+                    <p className="col-span-full text-center py-12 text-xs font-bold text-slate-400">
+                      {isRtl ? 'لا توجد وسائط مسبقة في المكتبة على الخادم.' : 'No media items found in library on server.'}
                     </p>
                   )}
                 </div>

@@ -1,8 +1,125 @@
 import React, { useState } from 'react';
-import { ArrowUpRight, ArrowUpLeft, Target, Zap, Sparkles, X, Check, Image as ImageIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ArrowUpRight, ArrowUpLeft, Target, Zap, Sparkles, X, Check, Image as ImageIcon, ChevronLeft, ChevronRight, Play } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLanguage } from '../context/LanguageContext';
 import { useData } from '../context/DataContext';
+
+interface ProjectVideoProps {
+  src: string;
+  className?: string;
+  onClick?: (e: React.MouseEvent) => void;
+}
+
+function ProjectAutoplayVideo({ src, className, onClick }: ProjectVideoProps) {
+  const videoRef = React.useRef<HTMLVideoElement | null>(null);
+
+  React.useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            // Pause any other playing videos on the page to prevent multiple overlapping playbacks
+            document.querySelectorAll('video').forEach((v) => {
+              if (v !== video && !v.paused) {
+                try {
+                  v.pause();
+                } catch {
+                  // ignore safe catch
+                }
+              }
+            });
+
+            video.play().catch(() => {
+              // Safe catch if browser autoplay policies block initial play
+            });
+          } else {
+            if (!video.paused) {
+              try {
+                video.pause();
+              } catch {
+                // ignore
+              }
+            }
+          }
+        });
+      },
+      { threshold: 0.5 }
+    );
+
+    observer.observe(video);
+
+    return () => {
+      observer.disconnect();
+      if (video && !video.paused) {
+        try {
+          video.pause();
+        } catch {
+          // ignore
+        }
+      }
+    };
+  }, [src]);
+
+  return (
+    <video
+      ref={videoRef}
+      src={src}
+      controls
+      muted
+      playsInline
+      preload="metadata"
+      className={className}
+      onClick={onClick}
+    />
+  );
+}
+
+function ModalVideoPlayer({ src, className }: { src: string; className?: string }) {
+  const videoRef = React.useRef<HTMLVideoElement | null>(null);
+
+  React.useEffect(() => {
+    const video = videoRef.current;
+    if (!video) return;
+
+    // Pause all background videos when modal opens
+    document.querySelectorAll('video').forEach((v) => {
+      if (v !== video && !v.paused) {
+        try {
+          v.pause();
+        } catch {
+          // ignore
+        }
+      }
+    });
+
+    video.play().catch(() => {
+      // Safe catch for browser policies
+    });
+
+    return () => {
+      if (video) {
+        video.pause();
+        video.currentTime = 0;
+      }
+    };
+  }, [src]);
+
+  return (
+    <video
+      ref={videoRef}
+      src={src}
+      controls
+      autoPlay
+      muted
+      playsInline
+      preload="metadata"
+      className={className}
+    />
+  );
+}
 
 interface FeaturedProjectsProps {
   onOpenConsultation?: () => void;
@@ -57,13 +174,32 @@ export function FeaturedProjects({ onOpenConsultation }: FeaturedProjectsProps) 
     return list;
   }, [cmsProjects, cmsServices, isRtl]);
 
-  // Map CMS published projects cleanly from database without mock unsplash fallback images
+  // Map CMS published projects cleanly from database including both images and videos
   const formattedProjects = publishedCmsProjects.map(p => {
-    const projectImages = (p.images && p.images.length > 0)
-      ? p.images
-      : ((p.image || p.img) ? [p.image || p.img || ''] : []);
+    const rawMedia = Array.isArray(p.media) && p.media.length > 0 ? p.media : [];
 
-    const primaryImage = projectImages.length > 0 ? projectImages[0] : (p.image || p.img || '');
+    const mediaItems: Array<{ url: string; isVideo: boolean; mimeType?: string }> = rawMedia.length > 0
+      ? rawMedia.map((m: any) => {
+          const rawUrl = typeof m === 'string' ? m : (m?.url || m?.file_path || '');
+          const isVid = typeof m === 'object' && m !== null
+            ? (m.media_type === 'video' || (m.mime_type && m.mime_type.startsWith('video/')) || /\.(mp4|webm|ogg|mov|m4v)$/i.test(rawUrl))
+            : /\.(mp4|webm|ogg|mov|m4v)$/i.test(rawUrl);
+          return {
+            url: rawUrl,
+            isVideo: isVid,
+            mimeType: m?.mime_type
+          };
+        }).filter(m => Boolean(m.url))
+      : (p.images && p.images.length > 0 ? p.images : [p.image || p.img || ''])
+          .filter(Boolean)
+          .map(url => ({
+            url,
+            isVideo: /\.(mp4|webm|ogg|mov|m4v)$/i.test(url)
+          }));
+
+    const primaryMedia = mediaItems.length > 0 ? mediaItems[0] : null;
+    const projectImages = mediaItems.map(m => m.url);
+    const primaryImage = primaryMedia ? primaryMedia.url : '';
 
     return {
       id: p.id,
@@ -75,6 +211,8 @@ export function FeaturedProjects({ onOpenConsultation }: FeaturedProjectsProps) 
       fullDescription: (language === 'ar' ? (p.fullDescriptionAr || p.descriptionAr) : (p.fullDescriptionEn || p.descriptionEn)) || '',
       image: primaryImage,
       images: projectImages,
+      mediaItems: mediaItems,
+      primaryMedia: primaryMedia,
       stats: {
         label: language === 'ar' ? 'إنجاز' : 'Metric',
         value: (language === 'ar' ? p.statsAr : p.statsEn) || (language === 'ar' ? 'أداء ممتاز' : 'High Performance')
@@ -119,11 +257,11 @@ export function FeaturedProjects({ onOpenConsultation }: FeaturedProjectsProps) 
 
   const selectedProject = formattedProjects.find(p => p.id === selectedProjectId);
 
-  const activeModalImage = selectedProject
-    ? (selectedProject.images && selectedProject.images.length > 0
-        ? selectedProject.images[selectedImageIndex] || selectedProject.images[0]
-        : selectedProject.image)
-    : '';
+  const activeModalMedia = selectedProject
+    ? (selectedProject.mediaItems && selectedProject.mediaItems.length > 0
+        ? selectedProject.mediaItems[selectedImageIndex] || selectedProject.mediaItems[0]
+        : selectedProject.primaryMedia)
+    : null;
 
   const resultsList = selectedProject?.results
     ? selectedProject.results.split('.').map(s => s.trim()).filter(Boolean)
@@ -192,22 +330,31 @@ export function FeaturedProjects({ onOpenConsultation }: FeaturedProjectsProps) 
                     setSelectedImageIndex(0);
                   }}
                 >
-                  {/* Image Container */}
+                  {/* Media Container */}
                   <div className="relative aspect-[16/9] sm:aspect-[16/9.5] overflow-hidden bg-slate-100 border-b border-[#E5E7EB]">
-                    {project.image ? (
-                      <motion.img
-                        src={project.image}
-                        alt={project.title}
-                        referrerPolicy="no-referrer"
-                        className="object-cover w-full h-full scale-105 group-hover:scale-120"
-                        transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
-                      />
+                    {project.primaryMedia ? (
+                      project.primaryMedia.isVideo ? (
+                        <ProjectAutoplayVideo
+                          src={project.primaryMedia.url}
+                          className="object-cover w-full h-full"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      ) : (
+                        <motion.img
+                          src={project.primaryMedia.url}
+                          alt={project.title}
+                          loading="lazy"
+                          referrerPolicy="no-referrer"
+                          className="object-cover w-full h-full scale-105 group-hover:scale-120"
+                          transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
+                        />
+                      )
                     ) : (
                       <div className="w-full h-full bg-gradient-to-br from-slate-900 via-slate-800 to-slate-950 flex flex-col items-center justify-center p-4 relative overflow-hidden">
                         <div className="absolute inset-0 bg-gradient-to-tr from-[#5683FC]/20 via-[#F20530]/10 to-transparent opacity-60 pointer-events-none" />
                         <ImageIcon className="w-10 h-10 text-slate-500 mb-2 relative z-10" />
                         <span className="text-xs font-bold text-slate-400 relative z-10 text-center">
-                          {isRtl ? 'مشروع بدون صور' : 'No Images Available'}
+                          {isRtl ? 'مشروع بدون وسائط' : 'No Media Available'}
                         </span>
                       </div>
                     )}
@@ -220,11 +367,15 @@ export function FeaturedProjects({ onOpenConsultation }: FeaturedProjectsProps) 
                     </div>
 
                     {/* Gallery Count Pill */}
-                    {project.images && project.images.length > 1 && (
+                    {project.mediaItems && project.mediaItems.length > 1 && (
                       <div className={`absolute top-4 ${isRtl ? 'left-4' : 'right-4'}`}>
                         <span className="px-2.5 py-1 bg-slate-900/85 backdrop-blur-md text-white font-mono font-bold rounded-full text-[10px] tracking-wide border border-white/20 shadow-sm flex items-center gap-1">
-                          <ImageIcon className="w-3 h-3 text-[#2EDFF2]" />
-                          {project.images.length} {isRtl ? 'صور' : 'Photos'}
+                          {project.mediaItems.some(m => m.isVideo) ? (
+                            <Play className="w-3 h-3 text-[#2EDFF2] fill-[#2EDFF2]" />
+                          ) : (
+                            <ImageIcon className="w-3 h-3 text-[#2EDFF2]" />
+                          )}
+                          {project.mediaItems.length} {isRtl ? 'وسائط' : 'Media'}
                         </span>
                       </div>
                     )}
@@ -306,20 +457,27 @@ export function FeaturedProjects({ onOpenConsultation }: FeaturedProjectsProps) 
               exit={{ opacity: 0, scale: 0.96 }}
               className="bg-white border border-slate-100 rounded-3xl w-full max-w-2xl overflow-hidden shadow-2xl relative max-h-[90vh] flex flex-col"
             >
-              {/* Cover Image & Active Photo Showcase */}
+              {/* Cover Image / Video & Active Photo Showcase */}
               <div className="h-64 sm:h-72 overflow-hidden relative shrink-0 bg-slate-900">
-                {activeModalImage ? (
-                  <img
-                    src={activeModalImage}
-                    alt={selectedProject.title}
-                    referrerPolicy="no-referrer"
-                    className="object-cover w-full h-full scale-105 transition-all duration-500"
-                  />
+                {activeModalMedia ? (
+                  activeModalMedia.isVideo ? (
+                    <ModalVideoPlayer
+                      src={activeModalMedia.url}
+                      className="w-full h-full object-contain bg-black"
+                    />
+                  ) : (
+                    <img
+                      src={activeModalMedia.url}
+                      alt={selectedProject.title}
+                      referrerPolicy="no-referrer"
+                      className="object-cover w-full h-full scale-105 transition-all duration-500"
+                    />
+                  )
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-slate-900 to-slate-950 flex flex-col items-center justify-center p-4">
                     <ImageIcon className="w-12 h-12 text-slate-600 mb-2" />
                     <span className="text-xs font-bold text-slate-400">
-                      {isRtl ? 'لا توجد صور لهذا المشروع' : 'No Media Uploaded'}
+                      {isRtl ? 'لا توجد وسائط لهذا المشروع' : 'No Media Uploaded'}
                     </span>
                   </div>
                 )}
@@ -342,14 +500,14 @@ export function FeaturedProjects({ onOpenConsultation }: FeaturedProjectsProps) 
                 </div>
               </div>
 
-              {/* Multi-Image Gallery Bar (if project has more than 1 image) */}
-              {selectedProject.images && selectedProject.images.length > 1 && (
+              {/* Multi-Media Gallery Bar (if project has more than 1 media item) */}
+              {selectedProject.mediaItems && selectedProject.mediaItems.length > 1 && (
                 <div className="px-4 py-2.5 bg-slate-950 border-b border-slate-800 flex items-center gap-2 overflow-x-auto shrink-0">
                   <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider shrink-0">
-                    {isRtl ? 'الصور (' + selectedProject.images.length + '):' : 'Gallery (' + selectedProject.images.length + '):'}
+                    {isRtl ? 'الوسائط (' + selectedProject.mediaItems.length + '):' : 'Gallery (' + selectedProject.mediaItems.length + '):'}
                   </span>
                   <div className="flex items-center gap-2 overflow-x-auto py-0.5">
-                    {selectedProject.images.map((imgUrl, idx) => (
+                    {selectedProject.mediaItems.map((mediaItem, idx) => (
                       <button
                         key={idx}
                         onClick={() => setSelectedImageIndex(idx)}
@@ -359,7 +517,14 @@ export function FeaturedProjects({ onOpenConsultation }: FeaturedProjectsProps) 
                             : 'border-slate-700 opacity-55 hover:opacity-100 hover:scale-102'
                         }`}
                       >
-                        <img src={imgUrl} alt={`${selectedProject.title} ${idx + 1}`} className="w-full h-full object-cover" />
+                        {mediaItem.isVideo ? (
+                          <div className="w-full h-full bg-slate-900 flex items-center justify-center relative">
+                            <video src={mediaItem.url} className="w-full h-full object-cover opacity-60" preload="metadata" />
+                            <Play className="w-4 h-4 text-white absolute inset-0 m-auto fill-white" />
+                          </div>
+                        ) : (
+                          <img src={mediaItem.url} alt={`${selectedProject.title} ${idx + 1}`} className="w-full h-full object-cover" />
+                        )}
                       </button>
                     ))}
                   </div>

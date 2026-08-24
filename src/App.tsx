@@ -14,8 +14,9 @@ import { Testimonials } from './components/Testimonials';
 import { CTASection } from './components/CTASection';
 import { Footer } from './components/Footer';
 import { ConsultationModal } from './components/ConsultationModal';
-import { AdminLogin } from './components/AdminLogin';
-import { AdminDashboard } from './components/AdminDashboard';
+
+const AdminLogin = React.lazy(() => import('./components/AdminLogin').then(m => ({ default: m.AdminLogin })));
+const AdminDashboard = React.lazy(() => import('./components/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
 
 type AppView = 'landing' | 'admin-login' | 'admin-dashboard';
 
@@ -88,20 +89,33 @@ function AppContent() {
     );
   }
 
+  const adminFallback = (
+    <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center">
+      <div className="text-center space-y-4">
+        <div className="w-10 h-10 border-3 border-[#F20530] border-t-transparent rounded-full animate-spin mx-auto" />
+        <p className="text-sm font-semibold text-slate-500">Loading module...</p>
+      </div>
+    </div>
+  );
+
   // Admin Dashboard — requires authentication
   if (currentView === 'admin-dashboard') {
     if (!isAuthenticated) {
       // Redirect to login if not authenticated
       window.location.hash = '#admin-login';
       return (
-        <AdminLogin
-          onBackToLanding={goToLanding}
-          onLoginSuccess={goToAdminDashboard}
-        />
+        <React.Suspense fallback={adminFallback}>
+          <AdminLogin
+            onBackToLanding={goToLanding}
+            onLoginSuccess={goToAdminDashboard}
+          />
+        </React.Suspense>
       );
     }
     return (
-      <AdminDashboard onLogout={handleLogout} />
+      <React.Suspense fallback={adminFallback}>
+        <AdminDashboard onLogout={handleLogout} />
+      </React.Suspense>
     );
   }
 
@@ -111,14 +125,18 @@ function AppContent() {
       // Already authenticated, go to dashboard
       window.location.hash = '#admin';
       return (
-        <AdminDashboard onLogout={handleLogout} />
+        <React.Suspense fallback={adminFallback}>
+          <AdminDashboard onLogout={handleLogout} />
+        </React.Suspense>
       );
     }
     return (
-      <AdminLogin
-        onBackToLanding={goToLanding}
-        onLoginSuccess={goToAdminDashboard}
-      />
+      <React.Suspense fallback={adminFallback}>
+        <AdminLogin
+          onBackToLanding={goToLanding}
+          onLoginSuccess={goToAdminDashboard}
+        />
+      </React.Suspense>
     );
   }
 

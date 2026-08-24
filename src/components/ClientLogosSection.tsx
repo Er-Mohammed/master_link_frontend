@@ -48,6 +48,7 @@ function LogoCard({ logo, index, isRtl, mediaItems }: LogoCardProps) {
           <img
             src={logoImage}
             alt={logo.company_name}
+            loading="lazy"
             className="relative z-10 object-contain object-center w-full h-full scale-140 sm:scale-150 group-hover:scale-160 opacity-95 group-hover:opacity-100 transition-all duration-500 ease-out filter drop-shadow-sm group-hover:drop-shadow-lg rounded-xl"
             onError={() => setImgError(true)}
           />

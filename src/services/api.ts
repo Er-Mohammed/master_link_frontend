@@ -987,7 +987,20 @@ export function mapLaravelProjectToItem(project: LaravelProject): ProjectItemMap
 }
 
 export function mapLaravelProjectToProjectItem(project: any): ProjectItem {
-  const mediaList = Array.isArray(project.media) ? project.media : [];
+  const rawMedia = Array.isArray(project.media) ? project.media : [];
+  const mediaList = rawMedia.map((m: any) => {
+    if (typeof m === 'string') return m;
+    let url = m.url || m.file_path || '';
+    if (url && !url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('data:')) {
+      const cleanPath = url.startsWith('/') ? url : `/${url}`;
+      url = API_BASE_URL ? `${API_BASE_URL}${cleanPath}` : cleanPath;
+    }
+    return {
+      ...m,
+      url
+    };
+  });
+
   const images = mediaList
     .map((m: any) => (typeof m === 'string' ? m : (m?.url || m?.file_path || '')))
     .filter(Boolean);
