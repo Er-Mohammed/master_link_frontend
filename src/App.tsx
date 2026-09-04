@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { motion, useScroll, useSpring } from 'motion/react';
 import { LanguageProvider } from './context/LanguageContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
-import { DataProvider } from './context/DataContext';
+import { DataProvider, useData } from './context/DataContext';
 import { Navigation } from './components/Navigation';
 import { Hero } from './components/Hero';
 import { TrustedCompanies } from './components/TrustedCompanies';
@@ -23,6 +23,7 @@ type AppView = 'landing' | 'admin-login' | 'admin-dashboard';
 function AppContent() {
   const [isConsultationOpen, setIsConsultationOpen] = useState(false);
   const { isAuthenticated, isLoading, logout } = useAuth();
+  const { isInitialDataReady } = useData();
 
   // Determine current view from hash
   const [currentView, setCurrentView] = useState<AppView>(() => {
@@ -76,6 +77,17 @@ function AppContent() {
     window.location.hash = '#admin-login';
     setCurrentView('admin-login');
   };
+
+  // Initial Public Data Loading state (prevents layout shifts & flash of default assets)
+  if (!isInitialDataReady && (currentView === 'landing' || currentView === 'admin-login')) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="w-10 h-10 border-3 border-[#5683FC] border-t-transparent rounded-full animate-spin mx-auto" />
+        </div>
+      </div>
+    );
+  }
 
   // Auth loading state
   if (isLoading && (currentView === 'admin-dashboard' || currentView === 'admin-login')) {

@@ -8,7 +8,6 @@
  */
 
 import {
-  projectsData,
   testimonialsData,
   clientLogosData,
   advantagesData,
@@ -27,9 +26,18 @@ import {
 } from '../types';
 import type { AdminRole } from '../lib/permissions';
 
-// ─── Base URL ────────────────────────────────────────────────────────
+// ─── Base URL & Media Resolution ─────────────────────────────────────
 const RAW_BASE = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000';
-const API_BASE_URL = RAW_BASE.replace(/\/+$/, '');
+export const API_BASE_URL = RAW_BASE.replace(/\/+$/, '');
+
+export function resolveMediaUrl(url?: string | null): string {
+  if (!url) return '';
+  if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
+    return url;
+  }
+  const cleanPath = url.startsWith('/') ? url : `/${url}`;
+  return API_BASE_URL ? `${API_BASE_URL}${cleanPath}` : cleanPath;
+}
 
 // ─── Token Storage ───────────────────────────────────────────────────
 const TOKEN_KEY = 'masterlink_admin_token';
@@ -899,6 +907,31 @@ export const adminSiteSettingsApi = {
   }
 };
 
+export const publicSiteSettingsApi = {
+  async getAll(): Promise<{ data: LaravelSiteSetting[] }> {
+    const response = await fetch(`${API_BASE_URL}/api/site-settings`, {
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch public site settings: ${response.status}`);
+    }
+    return await response.json() as { data: LaravelSiteSetting[] };
+  }
+};
+
+export const publicTestimonialsApi = {
+  async getAll(): Promise<{ data: LaravelTestimonial[] }> {
+    const response = await fetch(`${API_BASE_URL}/api/testimonials`, {
+      headers: { 'Accept': 'application/json' }
+    });
+    if (!response.ok) {
+      throw new Error(`Failed to fetch public testimonials: ${response.status}`);
+    }
+    return await response.json() as { data: LaravelTestimonial[] };
+  }
+};
+
+
 // ─── Admin Admins Management API Types & Endpoints ────────────────────
 export interface LaravelAdminRecord {
   id: number;
@@ -937,6 +970,22 @@ export const adminAdminsApi = {
 
   async delete(id: number | string): Promise<{ success: boolean; message: string }> {
     return adminApi.delete<{ success: boolean; message: string }>(`/api/admin/admins/${id}`);
+  }
+};
+
+export interface DashboardStatsResponse {
+  projects_count: number;
+  services_count: number;
+  new_consultations_count: number;
+  media_count: number;
+  media_total_size: number;
+  admins_count: number;
+  total_admins_count?: number;
+}
+
+export const adminDashboardApi = {
+  async getStats(): Promise<LaravelApiResponse<DashboardStatsResponse>> {
+    return adminApi.get<LaravelApiResponse<DashboardStatsResponse>>('/api/admin/dashboard/stats');
   }
 };
 
@@ -989,32 +1038,61 @@ export function mapLaravelProjectToItem(project: LaravelProject): ProjectItemMap
 export function mapLaravelProjectToProjectItem(project: any): ProjectItem {
   const rawMedia = Array.isArray(project.media) ? project.media : [];
   const mediaList = rawMedia.map((m: any) => {
-    if (typeof m === 'string') return m;
-    let url = m.url || m.file_path || '';
-    if (url && !url.startsWith('http://') && !url.startsWith('https://') && !url.startsWith('data:')) {
-      const cleanPath = url.startsWith('/') ? url : `/${url}`;
-      url = API_BASE_URL ? `${API_BASE_URL}${cleanPath}` : cleanPath;
+    if (typeof m === 'string') {
+      const resolved = resolveMediaUrl(m);
+      const isVid = /\.(mp4|webm|ogg|mov)$/i.test(m);
+      return {
+        id: m,
+        url: resolved,
+        file_path: resolved,
+        media_type: isVid ? 'video' : 'image',
+        file_name: m.split('/').pop() || 'media',
+        extension: m.split('.').pop() || 'jpg'
+      };
     }
+    const rawUrl = m.url || m.file_path || '';
+    const resolvedUrl = resolveMediaUrl(rawUrl);
+
+    let mediaType = m.media_type;
+    if (!mediaType) {
+      if (m.mime_type?.startsWith('video/') || /\.(mp4|webm|ogg|mov)$/i.test(rawUrl)) {
+        mediaType = 'video';
+      } else {
+        mediaType = 'image';
+      }
+    }
+
     return {
       ...m,
-      url
+      id: m.id,
+      url: resolvedUrl,
+      file_path: resolvedUrl,
+      media_type: mediaType,
+      file_name: m.file_name || 'media',
+      extension: m.extension || '',
+      mime_type: m.mime_type || '',
+      file_size: m.file_size || 0,
+      alt_text: m.alt_text || null,
+      sort_order: m.sort_order ?? 0
     };
   });
 
-  const images = mediaList
-    .map((m: any) => (typeof m === 'string' ? m : (m?.url || m?.file_path || '')))
-    .filter(Boolean);
-
-  const primaryImage = images.length > 0 ? images[0] : '';
+  const imageMedia = mediaList.filter((m: any) => m.media_type === 'image');
+  const images = imageMedia.map((m: any) => m.url).filter(Boolean);
+  const primaryImage = images.length > 0
+    ? images[0]
+    : (mediaList.length > 0 ? mediaList[0].url : '');
 
   return {
     id: String(project.id),
+    categoryId: project.category_id || (project.category ? project.category.id : undefined),
+    rawCategory: project.category || null,
     titleEn: project.title || '',
     titleAr: project.title || '',
     nameEn: project.title || '',
     nameAr: project.title || '',
-    categoryEn: project.category?.name || 'Technical Services',
-    categoryAr: project.category?.name || 'خدماتنا التقنية',
+    categoryEn: project.category?.name || 'General Projects',
+    categoryAr: project.category?.name || 'عام المشاريع',
     descriptionEn: project.short_description || project.full_description || '',
     descriptionAr: project.short_description || project.full_description || '',
     fullDescriptionEn: project.full_description || '',
@@ -1025,13 +1103,17 @@ export function mapLaravelProjectToProjectItem(project: any): ProjectItem {
     media: mediaList,
     clientEn: project.client_name || '',
     clientAr: project.client_name || '',
+    clientName: project.client_name || '',
+    projectUrl: project.project_url || '',
+    completionDate: project.completion_date || '',
     status: project.is_active ? 'published' : 'hidden',
     featured: Boolean(project.is_featured),
-    displayOrder: project.sort_order || 0,
-    statsEn: 'High Performance',
-    statsAr: 'أداء ممتاز',
+    displayOrder: Number(project.sort_order ?? 0),
+    statsEn: '',
+    statsAr: '',
     tags: Array.isArray(project.services) ? project.services.map((s: any) => s.title || s) : [],
     services: Array.isArray(project.services) ? project.services.map((s: any) => s.title || s) : [],
+    rawServices: Array.isArray(project.services) ? project.services : [],
     createdAt: project.created_at,
     updatedAt: project.updated_at
   };
@@ -1095,6 +1177,25 @@ export const apiService = {
     return [];
   },
 
+  // 2.b Public Project Categories
+  async getProjectCategories(): Promise<LaravelProjectCategory[]> {
+    if (API_BASE_URL) {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/project-categories`);
+        if (res.ok) {
+          const json = await res.json();
+          const rawItems = json.data || json;
+          if (Array.isArray(rawItems)) {
+            return rawItems;
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to load public project categories from API:', err);
+      }
+    }
+    return [];
+  },
+
   // 3. Testimonials & Reviews
   async getTestimonials(): Promise<TestimonialModel[]> {
     if (API_BASE_URL) {
@@ -1105,10 +1206,10 @@ export const apiService = {
           return json.data || json;
         }
       } catch (err) {
-        console.warn('Fallback to local testimonials data:', err);
+        console.warn('Failed to load public testimonials from API:', err);
       }
     }
-    return testimonialsData;
+    return [];
   },
 
   // 4. Client / Partner Logos
@@ -1141,7 +1242,7 @@ export const apiService = {
         console.warn('Failed to load public client logos from API:', err);
       }
     }
-    return clientLogosData;
+    return [];
   },
 
   // 5. Advantages & Process Steps

@@ -194,6 +194,8 @@ export function BlogSection() {
                     alt={language === 'en' ? (post.titleEn || '') : (post.titleAr || '')} 
                     className="w-full h-full object-cover scale-105 group-hover:scale-115 transition-transform duration-500"
                     referrerPolicy="no-referrer"
+                    loading="lazy"
+                    decoding="async"
                   />
                   <div className="absolute inset-0 bg-gradient-to-t from-slate-900/40 via-transparent to-transparent opacity-80" />
                   
@@ -312,6 +314,8 @@ export function BlogSection() {
                   alt={language === 'en' ? (activePost.titleEn || '') : (activePost.titleAr || '')}
                   className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
+                  loading="lazy"
+                  decoding="async"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/40 to-slate-950/50" />
                 

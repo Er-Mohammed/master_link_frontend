@@ -92,6 +92,8 @@ export function TestimonialsSection() {
                           src={imageUrl}
                           alt={testimonial.media?.alt_text || displayName}
                           className="w-full h-full object-cover"
+                          loading="lazy"
+                          decoding="async"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
                             target.style.display = 'none';

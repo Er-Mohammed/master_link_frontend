@@ -36,7 +36,7 @@ export function Logo({
 }: LogoProps) {
   const { settings } = useData();
 
-  // Priority: settings.siteLogo -> settings.companyLogo -> defaultAsset fallback
+  // Priority: settings.siteLogo -> settings.companyLogo -> defaultAsset fallback (initial render fallback)
   const rawCustomLogo = settings?.siteLogo || settings?.companyLogo;
   const resolvedCustomLogo = resolveMediaUrl(rawCustomLogo);
   
@@ -64,13 +64,13 @@ export function Logo({
     }
   };
 
-  let sizeClasses = "h-11 sm:h-13 md:h-16"; // Public Header size (approx 44px-64px)
+  let sizeClasses = "h-10 sm:h-12 md:h-13"; // Public Header container
   if (variant === 'footer') {
-    sizeClasses = "h-20 sm:h-24 md:h-28"; // Public Footer size (approx 80px-112px)
+    sizeClasses = "h-20 sm:h-24 md:h-28"; // Public Footer container
   } else if (variant === 'login') {
-    sizeClasses = "h-20 sm:h-24 md:h-28"; // Login card logo size (approx 80px-112px)
+    sizeClasses = "h-20 sm:h-24 md:h-28"; // Login card logo container
   } else if (variant === 'admin') {
-    sizeClasses = "h-12 sm:h-14"; // Admin Header / Sidebar size (approx 48px-56px)
+    sizeClasses = "h-11 sm:h-12"; // Admin Header / Sidebar container
   }
 
   const siteName = alt || settings?.siteName || settings?.companyNameEn || "Master Link";
@@ -86,6 +86,7 @@ export function Logo({
         alt={siteName}
         className={`h-full w-auto max-h-full max-w-full object-contain transition-all duration-300 drop-shadow-sm ${imgClassName}`}
         loading="eager"
+        fetchPriority="high"
         decoding="async"
         onError={handleImageError}
       />

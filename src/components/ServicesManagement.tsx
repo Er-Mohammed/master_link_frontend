@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { useData } from '../context/DataContext';
 import { adminServicesApi, mapLaravelServiceToItem, mapServiceItemToLaravelPayload, authApi } from '../services/api';
 import { ServiceEditor } from './ServiceEditor';
 import { PremiumEmptyState } from './ui/PremiumEmptyState';
@@ -30,6 +31,7 @@ import { motion, AnimatePresence } from 'motion/react';
 export function ServicesManagement() {
   const { language, isRtl } = useLanguage();
   const { canPerform } = useAuth();
+  const { refreshDashboardStats } = useData();
   const [services, setServices] = useState<ServiceItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [apiError, setApiError] = useState<string | null>(null);
@@ -170,6 +172,7 @@ export function ServicesManagement() {
       const res = await adminServicesApi.create(duplicatePayload);
       if (res.data) {
         await loadServices();
+        refreshDashboardStats();
         setLastUpdatedText(`${service.title} (نسخة)`);
         triggerToast(
           language === 'en' ? `Duplicated "${service.title}" successfully.` : `تم تكرار "${service.title}" بنجاح في قاعدة البيانات.`,
@@ -226,6 +229,7 @@ export function ServicesManagement() {
       await adminServicesApi.delete(targetId);
       setServices(prev => prev.filter(s => s.id !== targetId));
       setSelectedIds(prev => prev.filter(id => id !== targetId));
+      refreshDashboardStats();
       if (targetService) {
         setLastUpdatedText(targetService.title);
         triggerToast(
@@ -319,6 +323,7 @@ export function ServicesManagement() {
       await Promise.all(selectedIds.map(id => adminServicesApi.delete(id)));
       await loadServices();
       setSelectedIds([]);
+      refreshDashboardStats();
       triggerToast(
         language === 'en' ? 'Selected services deleted from Laravel.' : 'تم حذف الخدمات المحددة نهائياً من قاعدة بيانات لارافيل.',
         'deleted'
@@ -427,6 +432,7 @@ export function ServicesManagement() {
           } else {
             await loadServices();
           }
+          refreshDashboardStats();
           if (updatedFields.title) {
             setLastUpdatedText(updatedFields.title);
           }

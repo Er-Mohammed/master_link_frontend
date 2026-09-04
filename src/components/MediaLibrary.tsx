@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { useData } from '../context/DataContext';
 import { adminMediaApi, authApi, LaravelMedia } from '../services/api';
 import { 
   Search, 
@@ -25,7 +26,10 @@ import {
   CheckCircle2, 
   FolderOpen, 
   Info,
-  Play
+  Play,
+  Check,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
@@ -33,22 +37,32 @@ export interface MediaLibraryProps {
   isOpen?: boolean;
   onClose?: () => void;
   selectable?: boolean;
+  multiple?: boolean;
   onSelectMedia?: (media: LaravelMedia) => void;
+  onSelectMultipleMedia?: (mediaItems: LaravelMedia[]) => void;
 }
 
 export function MediaLibrary({
   isOpen,
   onClose,
   selectable = false,
-  onSelectMedia
+  multiple = false,
+  onSelectMedia,
+  onSelectMultipleMedia
 }: MediaLibraryProps = {}) {
   const { language, isRtl } = useLanguage();
   const { canPerform } = useAuth();
+  const { refreshMedia, refreshDashboardStats } = useData();
 
   // API State
   const [mediaList, setMediaList] = useState<LaravelMedia[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [apiError, setApiError] = useState<string | null>(null);
+
+  // Multiple selection state
+  const [selectedIds, setSelectedIds] = useState<Set<number | string>>(new Set());
+  const [isBulkDeleting, setIsBulkDeleting] = useState<boolean>(false);
+  const [showBulkDeleteConfirm, setShowBulkDeleteConfirm] = useState<boolean>(false);
 
   // View style: 'grid' | 'list'
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
@@ -95,6 +109,65 @@ export function MediaLibrary({
     const sizes = ['Bytes', 'KB', 'MB', 'GB'];
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  // Multiple selection helpers
+  const toggleSelectItem = (id: number | string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const handleSelectAll = () => {
+    const allIds = mediaList.map(m => m.id);
+    setSelectedIds(new Set(allIds));
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedIds(new Set());
+  };
+
+  const handleConfirmMultipleSelection = () => {
+    const selectedItems = mediaList.filter(m => selectedIds.has(m.id));
+    if (onSelectMultipleMedia) {
+      onSelectMultipleMedia(selectedItems);
+    } else if (onSelectMedia && selectedItems.length > 0) {
+      onSelectMedia(selectedItems[0]);
+    }
+    if (onClose) onClose();
+  };
+
+  const handleBulkDeleteConfirm = async () => {
+    if (selectedIds.size === 0) return;
+    setIsBulkDeleting(true);
+    try {
+      const idsToDelete: (number | string)[] = Array.from(selectedIds);
+      let deletedCount = 0;
+      for (const id of idsToDelete) {
+        try {
+          await adminMediaApi.delete(id);
+          deletedCount++;
+        } catch (e) {
+          console.warn(`Failed to delete media ${id}:`, e);
+        }
+      }
+      showToast(`تم حذف ${deletedCount} من الوسائط المحددة بنجاح.`, 'danger');
+      setSelectedIds(new Set());
+      setShowBulkDeleteConfirm(false);
+      await fetchMedia();
+      try { refreshMedia?.(); } catch {}
+      try { refreshDashboardStats?.(); } catch {}
+    } catch (err: any) {
+      showToast(err?.message || 'حدث خطأ أثناء الحذف المتعدد.', 'danger');
+    } finally {
+      setIsBulkDeleting(false);
+    }
   };
 
   // Fetch Media from Laravel Backend
@@ -239,6 +312,8 @@ export function MediaLibrary({
       
       // Re-fetch live list from API
       await fetchMedia();
+      try { refreshMedia?.(); } catch {}
+      try { refreshDashboardStats?.(); } catch {}
     } catch (err: any) {
       if (err?.status === 401) {
         authApi.clearToken();
@@ -325,6 +400,8 @@ export function MediaLibrary({
       }
       setItemToDelete(null);
       await fetchMedia();
+      try { refreshMedia?.(); } catch {}
+      try { refreshDashboardStats?.(); } catch {}
     } catch (err: any) {
       if (err?.status === 401) {
         authApi.clearToken();
@@ -696,6 +773,29 @@ export function MediaLibrary({
               </select>
             </div>
 
+            {/* Select All Toggle Button */}
+            <button
+              onClick={selectedIds.size === mediaList.length && mediaList.length > 0 ? handleDeselectAll : handleSelectAll}
+              className={`px-3 py-1.5 rounded-xl border border-slate-200 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                selectedIds.size > 0
+                  ? 'bg-rose-50 border-rose-200 text-[#F20530]'
+                  : 'bg-slate-50 hover:bg-slate-100 text-slate-600'
+              }`}
+              title={selectedIds.size === mediaList.length ? (isRtl ? 'إلغاء تحديد الكل' : 'Deselect All') : (isRtl ? 'تحديد الكل' : 'Select All')}
+            >
+              {selectedIds.size === mediaList.length && mediaList.length > 0 ? (
+                <>
+                  <CheckSquare className="w-3.5 h-3.5" />
+                  <span>{isRtl ? 'إلغاء التحديد' : 'Deselect'}</span>
+                </>
+              ) : (
+                <>
+                  <Square className="w-3.5 h-3.5" />
+                  <span>{isRtl ? 'تحديد الكل' : 'Select All'}</span>
+                </>
+              )}
+            </button>
+
             {/* Grid/List togglers */}
             <div className="flex items-center border border-slate-200 rounded-xl p-1 bg-slate-50 shrink-0">
               <button
@@ -718,6 +818,67 @@ export function MediaLibrary({
 
         </div>
       </div>
+
+      {/* BULK SELECTION ACTION BAR */}
+      <AnimatePresence>
+        {selectedIds.size > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -10 }}
+            className={`p-4 bg-slate-950 text-white rounded-2xl border border-slate-900 shadow-xl flex flex-wrap items-center justify-between gap-4 ${isRtl ? 'flex-row-reverse' : ''}`}
+          >
+            <div className={`flex items-center gap-3 ${isRtl ? 'flex-row-reverse' : ''}`}>
+              <div className="w-8 h-8 rounded-xl bg-[#F20530] text-white flex items-center justify-center font-extrabold text-xs shadow-inner">
+                {selectedIds.size}
+              </div>
+              <span className="text-xs font-extrabold text-slate-200">
+                {isRtl ? `تم تحديد ${selectedIds.size} ملف/وسائط` : `${selectedIds.size} media item(s) selected`}
+              </span>
+            </div>
+
+            <div className={`flex items-center gap-2 ${isRtl ? 'flex-row-reverse' : ''}`}>
+              {selectedIds.size < mediaList.length ? (
+                <button
+                  onClick={handleSelectAll}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border border-slate-700"
+                >
+                  <CheckSquare className="w-3.5 h-3.5 text-rose-400" />
+                  <span>{isRtl ? 'تحديد الكل' : 'Select All'}</span>
+                </button>
+              ) : (
+                <button
+                  onClick={handleDeselectAll}
+                  className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border border-slate-700"
+                >
+                  <Square className="w-3.5 h-3.5 text-slate-400" />
+                  <span>{isRtl ? 'إلغاء التحديد' : 'Deselect All'}</span>
+                </button>
+              )}
+
+              {(selectable || multiple || onSelectMultipleMedia || onSelectMedia) && (
+                <button
+                  onClick={handleConfirmMultipleSelection}
+                  className="px-4 py-1.5 bg-[#F20530] hover:bg-rose-600 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md flex items-center gap-1.5"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>{isRtl ? 'تأكيد الاختيار' : 'Confirm Selection'}</span>
+                </button>
+              )}
+
+              {canPerform('media', 'delete') && (
+                <button
+                  onClick={() => setShowBulkDeleteConfirm(true)}
+                  className="px-3.5 py-1.5 bg-rose-500/20 hover:bg-rose-500/30 text-rose-400 border border-rose-500/30 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>{isRtl ? 'حذف المحددة' : 'Delete Selected'}</span>
+                </button>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* ERROR STATE */}
       {apiError && (
@@ -790,6 +951,23 @@ export function MediaLibrary({
                 >
                   {/* Thumbnail Layer with action triggers */}
                   <div className="aspect-video w-full relative bg-slate-100 overflow-hidden border-b border-slate-100 shrink-0">
+                    {/* Multi-select Checkbox */}
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleSelectItem(item.id);
+                      }}
+                      className={`absolute top-2.5 ${isRtl ? 'right-2.5' : 'left-2.5'} z-10 w-6.5 h-6.5 rounded-lg transition-all flex items-center justify-center cursor-pointer shadow-md ${
+                        selectedIds.has(item.id)
+                          ? 'bg-[#F20530] text-white border-2 border-white scale-105'
+                          : 'bg-black/40 text-white/70 hover:bg-black/70 hover:text-white border border-white/60'
+                      }`}
+                      title={selectedIds.has(item.id) ? (isRtl ? 'إلغاء تحديد' : 'Deselect') : (isRtl ? 'تحديد' : 'Select')}
+                    >
+                      <Check className={`w-3.5 h-3.5 stroke-[3] ${selectedIds.has(item.id) ? 'opacity-100' : 'opacity-40 hover:opacity-100'}`} />
+                    </button>
+
                     {renderThumbnail(item)}
                     
                     {/* Hover Overlay */}
@@ -900,6 +1078,20 @@ export function MediaLibrary({
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className={`border-b border-slate-100 bg-slate-50/50 text-[10px] font-bold text-slate-400 uppercase tracking-wider ${isRtl ? 'text-right' : 'text-left'}`}>
+                    <th className="py-4 px-3 w-10 text-center">
+                      <button
+                        type="button"
+                        onClick={selectedIds.size === mediaList.length && mediaList.length > 0 ? handleDeselectAll : handleSelectAll}
+                        className={`w-4 h-4 rounded transition-all inline-flex items-center justify-center cursor-pointer border ${
+                          selectedIds.size > 0 && selectedIds.size === mediaList.length
+                            ? 'bg-[#F20530] border-[#F20530] text-white'
+                            : 'bg-white border-slate-300 hover:border-slate-400'
+                        }`}
+                        title={selectedIds.size === mediaList.length ? (isRtl ? 'إلغاء تحديد الكل' : 'Deselect All') : (isRtl ? 'تحديد الكل' : 'Select All')}
+                      >
+                        {selectedIds.size > 0 && <Check className="w-3 h-3 stroke-[3]" />}
+                      </button>
+                    </th>
                     <th className="py-4 px-5">{isRtl ? 'الملف والمعاينة' : 'File & ID'}</th>
                     <th className="py-4 px-4">{isRtl ? 'نوع الوسائط' : 'Type'}</th>
                     <th className="py-4 px-4">{isRtl ? 'الحجم' : 'Size'}</th>
@@ -916,8 +1108,24 @@ export function MediaLibrary({
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         key={item.id}
-                        className="hover:bg-slate-50/50 transition-all group"
+                        className={`hover:bg-slate-50/50 transition-all group ${selectedIds.has(item.id) ? 'bg-rose-50/30' : ''}`}
                       >
+                        <td className="py-3 px-3 text-center">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggleSelectItem(item.id);
+                            }}
+                            className={`w-4.5 h-4.5 rounded-md transition-all inline-flex items-center justify-center cursor-pointer border ${
+                              selectedIds.has(item.id)
+                                ? 'bg-[#F20530] border-[#F20530] text-white'
+                                : 'bg-white border-slate-300 hover:border-[#F20530]'
+                            }`}
+                          >
+                            {selectedIds.has(item.id) && <Check className="w-3 h-3 stroke-[3]" />}
+                          </button>
+                        </td>
                         <td className="py-3 px-5">
                           <div className={`flex items-center gap-3.5 ${isRtl ? 'flex-row-reverse' : ''}`}>
                             <div className="w-12 h-8 rounded-lg overflow-hidden shrink-0 border border-slate-200 bg-slate-50 relative">
@@ -1239,6 +1447,66 @@ export function MediaLibrary({
                     </>
                   ) : (
                     <span>تأكيد الحذف نهائياً</span>
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* POPUP 4: BULK DELETE CONFIRMATION MODAL */}
+      <AnimatePresence>
+        {showBulkDeleteConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60 backdrop-blur-xs" onClick={() => setShowBulkDeleteConfirm(false)} />
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white rounded-2xl max-w-md w-full border border-slate-200 p-6 shadow-2xl z-10 space-y-4"
+            >
+              <div className={`flex items-center gap-3 border-b border-slate-100 pb-3 ${isRtl ? 'flex-row-reverse text-right' : 'flex-row text-left'}`}>
+                <div className="p-2 rounded-lg bg-rose-50 text-[#F20530]">
+                  <Trash2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900">
+                    {isRtl ? 'حذف العناصر المحددة نهائياً' : 'Bulk Delete Selected Assets'}
+                  </h3>
+                  <span className="text-[10px] text-slate-400 font-bold block">
+                    {isRtl ? `${selectedIds.size} ملف/وسائط محددة` : `${selectedIds.size} item(s) selected`}
+                  </span>
+                </div>
+              </div>
+
+              <p className="text-xs text-slate-500 font-semibold leading-relaxed">
+                {isRtl
+                  ? `هل أنت متأكد من رغبتك في حذف ${selectedIds.size} ملف نهائياً من الخادم والقاعدة؟ لا يمكن التراجع عن هذا الإجراء.`
+                  : `Are you sure you want to permanently delete ${selectedIds.size} files from the server and database? This action cannot be undone.`}
+              </p>
+
+              <div className={`flex items-center justify-end gap-2 pt-2 ${isRtl ? 'flex-row-reverse' : ''}`}>
+                <button
+                  type="button"
+                  onClick={() => setShowBulkDeleteConfirm(false)}
+                  disabled={isBulkDeleting}
+                  className="px-4 py-2 border border-slate-200 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-50 cursor-pointer"
+                >
+                  {isRtl ? 'إلغاء' : 'Cancel'}
+                </button>
+                <button
+                  onClick={handleBulkDeleteConfirm}
+                  disabled={isBulkDeleting}
+                  className="px-4 py-2 bg-[#F20530] hover:bg-rose-600 disabled:opacity-50 text-white rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer"
+                >
+                  {isBulkDeleting ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <span>{isRtl ? 'جاري الحذف...' : 'Deleting...'}</span>
+                    </>
+                  ) : (
+                    <span>{isRtl ? 'تأكيد الحذف نهائياً' : 'Confirm Bulk Delete'}</span>
                   )}
                 </button>
               </div>

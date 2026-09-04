@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { ClientLogo, MediaLibraryItem, TestimonialModel, ServiceMediaItem } from '../types';
-import { adminSiteSettingsApi, apiService } from '../services/api';
+import { adminSiteSettingsApi, publicSiteSettingsApi, adminMediaApi, apiService, publicTestimonialsApi, adminTestimonialsApi, LaravelTestimonial, LaravelProjectCategory, adminDashboardApi, DashboardStatsResponse } from '../services/api';
 
 export interface ServiceItem {
   id: string;
@@ -233,146 +233,7 @@ const DEFAULT_SERVICES: ServiceItem[] = [
   }
 ];
 
-const DEFAULT_PROJECTS: ProjectItem[] = [
-  {
-    id: 'proj-1',
-    titleEn: 'Enterprise E-Commerce Store & Mobile App Platform',
-    titleAr: 'منصة المتجر والتطبيق الإلكتروني التجاري الشامل',
-    nameEn: 'Enterprise E-Commerce Store & Mobile App Platform',
-    nameAr: 'منصة المتجر والتطبيق الإلكتروني التجاري الشامل',
-    categoryEn: 'Technical Services',
-    categoryAr: 'خدماتنا التقنية',
-    descriptionEn: 'High-speed custom e-commerce web platform, mobile applications, and micro systems integration.',
-    descriptionAr: 'تصميم وبناء موقع وتطبيق متجر إلكتروني متكامل وأنظمة مصغرة للحلول التجارية عالية الكفاءة.',
-    image: 'https://images.unsplash.com/photo-1556742049-0a67e517a461?auto=format&fit=crop&w=1200&q=80',
-    img: 'https://images.unsplash.com/photo-1556742049-0a67e517a461?auto=format&fit=crop&w=1200&q=80',
-    clientEn: 'Saudi Retail Group',
-    clientAr: 'مجموعة التجزئة السعودية',
-    year: '2026',
-    date: '2026-05-12',
-    statsEn: '+280% Sales & Orders Growth',
-    statsAr: '+280% نمو في المبيعات والطلبات',
-    tags: ['المواقع والمتاجر', 'تطبيقات الجوال', 'الأنظمة المصغرة', 'E-Commerce'],
-    services: ['المواقع والمتاجر', 'تطبيقات الجوال', 'الأنظمة المصغرة', 'E-Commerce'],
-    featured: true,
-    status: 'published'
-  },
-  {
-    id: 'proj-2',
-    titleEn: 'Omni-Channel Marketing Campaign & SEO Scaling',
-    titleAr: 'إدارة الحملات التسويقية المتكاملة وتصدر الـ SEO',
-    nameEn: 'Omni-Channel Marketing Campaign & SEO Scaling',
-    nameAr: 'إدارة الحملات التسويقية المتكاملة وتصدر الـ SEO',
-    categoryEn: 'Marketing Services',
-    categoryAr: 'خدماتنا التسويقية',
-    descriptionEn: 'Multi-platform marketing campaign management, motion graphics, graphic design, SEO, and influencer campaigns.',
-    descriptionAr: 'إدارة شاملة للحملات والصفحات وفيديوهات الموشن والتصميم الجرافيكي مع تصدر نتائج البحث وتسويق المؤثرين.',
-    image: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1200&q=80',
-    img: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?auto=format&fit=crop&w=1200&q=80',
-    clientEn: 'Riyadh Growth Holdings',
-    clientAr: 'مؤسسة نمو الرياض',
-    year: '2026',
-    date: '2026-04-18',
-    statsEn: '+340% Organic Traffic & Leads',
-    statsAr: '+340% زيارات وتفاعلات عضوية',
-    tags: ['إدارة الحملات', 'SEO', 'موشن جرافيك', 'المؤثرين'],
-    services: ['إدارة الحملات', 'SEO', 'موشن جرافيك', 'المؤثرين'],
-    featured: true,
-    status: 'published'
-  },
-  {
-    id: 'proj-3',
-    titleEn: 'Commercial Video Shooting & Product Photography',
-    titleAr: 'تصوير الفيديوهات الإعلانية وتصوير المنتجات',
-    nameEn: 'Commercial Video Shooting & Product Photography',
-    nameAr: 'تصوير الفيديوهات الإعلانية وتصوير المنتجات',
-    categoryEn: 'Advertising & Media',
-    categoryAr: 'خدماتنا الإعلانية والتصوير',
-    descriptionEn: 'High-end commercial video production and studio product photography showcasing luxury product lines.',
-    descriptionAr: 'إنتاج سينمائي احترافي للإعلانات التجارية وتصوير استوديوهاتي عالي الدقة للمنتجات.',
-    image: 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?auto=format&fit=crop&w=1200&q=80',
-    img: 'https://images.unsplash.com/photo-1574717024653-61fd2cf4d44d?auto=format&fit=crop&w=1200&q=80',
-    clientEn: 'Aura Luxury Products',
-    clientAr: 'منتجات أورا الفاخرة',
-    year: '2025',
-    date: '2025-11-20',
-    statsEn: '5.2M Campaign Video Views',
-    statsAr: '5.2 مليون مشاهدة للإعلان',
-    tags: ['تصوير إعلاني', 'تصوير منتجات', 'إنتاج مرئي'],
-    services: ['تصوير إعلاني', 'تصوير منتجات', 'إنتاج مرئي'],
-    featured: true,
-    status: 'published'
-  },
-  {
-    id: 'proj-4',
-    titleEn: 'Digital Project Analysis & Marketing Strategy Study',
-    titleAr: 'الدراسات والتحليل الرقمي والاستشارات الاستراتيجية',
-    nameEn: 'Digital Project Analysis & Marketing Strategy Study',
-    nameAr: 'الدراسات والتحليل الرقمي والاستشارات الاستراتيجية',
-    categoryEn: 'Digital Consulting',
-    categoryAr: 'استشارات ودراسات رقمية',
-    descriptionEn: 'In-depth digital studies, market opportunity analysis, and tailored strategic tech consulting.',
-    descriptionAr: 'دراسة رقمية استراتيجية شملت تحليل السوق والفرص وتوجيه المسار التقني والتسويقي للمشروع.',
-    image: 'https://images.unsplash.com/photo-1450133064473-71024230f91b?auto=format&fit=crop&w=1200&q=80',
-    img: 'https://images.unsplash.com/photo-1450133064473-71024230f91b?auto=format&fit=crop&w=1200&q=80',
-    clientEn: 'Vanguard Ventures',
-    clientAr: 'فانغارد للاستثمار',
-    year: '2025',
-    date: '2025-10-15',
-    statsEn: '100% Roadmap Feasibility',
-    statsAr: '100% دقة وجدوى الخطة الرقمية',
-    tags: ['استشارات تسويقية', 'تحليل رقمي', 'دراسات جدوى'],
-    services: ['استشارات تسويقية', 'تحليل رقمي', 'دراسات جدوى'],
-    featured: false,
-    status: 'published'
-  },
-  {
-    id: 'proj-5',
-    titleEn: 'Complete Brand Identity & Visual Guidelines',
-    titleAr: 'استراتيجية وتصميم الهوية البصرية ودليل الهوية',
-    nameEn: 'Complete Brand Identity & Visual Guidelines',
-    nameAr: 'استراتيجية وتصميم الهوية البصرية ودليل الهوية',
-    categoryEn: 'Branding & Identity',
-    categoryAr: 'الشعارات والهويات البصرية',
-    descriptionEn: 'Full identity strategy, logo design, visual elements, applications, and comprehensive brand guideline book.',
-    descriptionAr: 'بناء استراتيجية الهوية وتصميم الشعار والعناصر البصرية وتطبيقاتها مع إعداد دليل الهوية المتكامل.',
-    image: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
-    img: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1200&q=80',
-    clientEn: 'Horizon Group',
-    clientAr: 'مجموعة الأفق القابضة',
-    year: '2025',
-    date: '2025-08-10',
-    statsEn: '+190% Brand Recognition',
-    statsAr: '+190% ارتفاع تميز العلامة البصرية',
-    tags: ['تصميم الشعار', 'دليل الهوية', 'العناصر البصرية'],
-    services: ['تصميم الشعار', 'دليل الهوية', 'العناصر البصرية'],
-    featured: true,
-    status: 'published'
-  },
-  {
-    id: 'proj-6',
-    titleEn: 'AI Marketing Content & Cinematic Generation',
-    titleAr: 'صناعة المحتوى وتوليد الصور والفيديوهات بالذكاء الاصطناعي',
-    nameEn: 'AI Marketing Content & Cinematic Generation',
-    nameAr: 'صناعة المحتوى وتوليد الصور والفيديوهات بالذكاء الاصطناعي',
-    categoryEn: 'AI Production',
-    categoryAr: 'الإنتاج بالذكاء الاصطناعي',
-    descriptionEn: 'Marketing copy creation, AI image and room generation, and high-quality cinematic AI video creation.',
-    descriptionAr: 'صياغة المحتوى التسويقي الذكي، وتوليد صور ورومات بالذكاء الاصطناعي، وإنتاج فيديوهات فائقة الجودة.',
-    image: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=1200&q=80',
-    img: 'https://images.unsplash.com/photo-1526374965328-7f61d4dc18c5?auto=format&fit=crop&w=1200&q=80',
-    clientEn: 'Future Tech Hub',
-    clientAr: 'مركز تقنيات المستقبل',
-    year: '2026',
-    date: '2026-03-01',
-    statsEn: '10x Faster Content Creation',
-    statsAr: '10x سرعة أسرع في إنتاج المحتوى',
-    tags: ['الذكاء الاصطناعي', 'كتابة المحتوى', 'توليد الصور والفيديو'],
-    services: ['الذكاء الاصطناعي', 'كتابة المحتوى', 'توليد الصور والفيديو'],
-    featured: true,
-    status: 'published'
-  }
-];
+
 
 const DEFAULT_POSTS: PostItem[] = [
   {
@@ -450,23 +311,18 @@ const DEFAULT_POSTS: PostItem[] = [
 ];
 
 const DEFAULT_SETTINGS: SettingsState = {
-  companyNameEn: 'Master Link Agency',
-  companyNameAr: 'شركة ماستر لينك',
+  companyNameEn: '',
+  companyNameAr: '',
   companyLogo: '',
-  companyEmail: 'info@mastrlink.com',
-  companyPhone: '771039883 - 543059985',
-  companyAddressEn: "Sana'a - Yemen | Saudi Arabia - Jeddah",
-  companyAddressAr: 'صنعاء - اليمن | السعودية - جدة',
-  workingHoursEn: 'Sun - Thu: 8:00 AM - 5:00 PM',
-  workingHoursAr: 'الأحد - الخميس: 8:00 صباحاً - 5:00 مساءً',
-  aboutCompanyEn: 'Master Link is a technology and marketing agency established from an innovative and creative vision. We are a team of experts and creatives bridging the link between organizations and their clients, transforming client visions into tangible reality. Master Link combines professionalism and technology to deliver unique services that meet digital business ambitions.',
-  aboutCompanyAr: 'شركة ماستر لينك، شركة تقنية وتسويقية أُنشئت من رؤية إبداعية ومبتكرة نحن فريق من الخبراء والمبدعين لعمل حلقة ربط بين الجهة وعملائها وتحويل رؤى العملاء إلى واقع ملموس، تجمع ماستر لينك بين الاحتراف والتكنولوجيا لتقديم خدمات فريدة تلبي تطلعات الأعمال الرقمية.',
-  socials: [
-    { id: 'soc-1', platform: 'twitter', url: 'https://x.com/masterlink' },
-    { id: 'soc-2', platform: 'linkedin', url: 'https://linkedin.com/company/masterlink' },
-    { id: 'soc-3', platform: 'instagram', url: 'https://instagram.com/masterlink' },
-    { id: 'soc-4', platform: 'github', url: 'https://github.com/masterlink' }
-  ],
+  companyEmail: '',
+  companyPhone: '',
+  companyAddressEn: '',
+  companyAddressAr: '',
+  workingHoursEn: '',
+  workingHoursAr: '',
+  aboutCompanyEn: '',
+  aboutCompanyAr: '',
+  socials: [],
   seoTitleEn: 'MasterLink | Next-Gen Software & Digital Solutions',
   seoTitleAr: 'ماستر لينك | حلول البرمجة والتحول الرقمي المتكاملة',
   seoDescriptionEn: 'Leader in high-performance web development, mobile applications, AI integration, and visual branding in Saudi Arabia.',
@@ -808,12 +664,17 @@ export const DEFAULT_MEDIA_ITEMS: MediaLibraryItem[] = [
 interface DataContextType {
   services: ServiceItem[];
   projects: ProjectItem[];
+  projectCategories: LaravelProjectCategory[];
   posts: PostItem[];
   settings: SettingsState;
+  isSettingsLoaded: boolean;
+  isInitialDataReady: boolean;
   consultations: ConsultationItem[];
   clientLogos: ClientLogo[];
   testimonials: TestimonialModel[];
   mediaItems: MediaLibraryItem[];
+  dashboardStats: DashboardStatsResponse | null;
+  refreshDashboardStats: () => Promise<void>;
 
   // Handlers for Testimonials
   setTestimonials: React.Dispatch<React.SetStateAction<TestimonialModel[]>>;
@@ -821,6 +682,7 @@ interface DataContextType {
   updateTestimonial: (id: string, updated: Partial<TestimonialModel>) => void;
   deleteTestimonial: (id: string) => void;
   restoreTestimonial: (id: string) => void;
+  refreshTestimonials: () => Promise<void>;
   
   // Handlers for Services
   setServices: React.Dispatch<React.SetStateAction<ServiceItem[]>>;
@@ -862,6 +724,7 @@ interface DataContextType {
   setMediaItems: React.Dispatch<React.SetStateAction<MediaLibraryItem[]>>;
   addMediaItem: (item: MediaLibraryItem) => void;
   deleteMediaItem: (id: string) => void;
+  refreshMedia: () => Promise<void>;
 
   triggerToast?: (message: string, type?: 'success' | 'danger' | 'warning' | 'info') => void;
 }
@@ -954,51 +817,20 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   });
 
-  // Projects state
-  const [projects, setProjects] = useState<ProjectItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('masterlink_projects_v3');
-      if (saved) return JSON.parse(saved);
-      const legacy = localStorage.getItem('masterlink_projects');
-      if (legacy) {
-        const parsed = JSON.parse(legacy);
-        if (Array.isArray(parsed) && parsed.some((p: ProjectItem) => p.categoryAr === 'خدماتنا التقنية' || p.categoryEn === 'Technical Services')) {
-          return parsed;
-        }
-      }
-      return DEFAULT_PROJECTS;
-    } catch {
-      return DEFAULT_PROJECTS;
-    }
-  });
+  // Projects state (100% Backend API driven)
+  const [projects, setProjects] = useState<ProjectItem[]>([]);
+
+  // Project Categories state (100% Backend API driven)
+  const [projectCategories, setProjectCategories] = useState<LaravelProjectCategory[]>([]);
 
   // Posts state
-  const [posts, setPosts] = useState<PostItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('masterlink_posts');
-      return saved ? JSON.parse(saved) : DEFAULT_POSTS;
-    } catch {
-      return DEFAULT_POSTS;
-    }
-  });
+  // Posts state (100% Backend API driven)
+  const [posts, setPosts] = useState<PostItem[]>([]);
 
-  // Settings state
-  const [settings, setSettings] = useState<SettingsState>(() => {
-    try {
-      const saved = localStorage.getItem('masterlink_settings_v3');
-      if (saved) return JSON.parse(saved);
-      const legacy = localStorage.getItem('masterlink_settings');
-      if (legacy) {
-        const parsed = JSON.parse(legacy);
-        if (parsed && parsed.companyEmail === 'info@mastrlink.com') {
-          return parsed;
-        }
-      }
-      return DEFAULT_SETTINGS;
-    } catch {
-      return DEFAULT_SETTINGS;
-    }
-  });
+  // Settings state (100% Backend API driven)
+  const [settings, setSettings] = useState<SettingsState>(DEFAULT_SETTINGS);
+  const [isSettingsLoaded, setIsSettingsLoaded] = useState<boolean>(false);
+  const [isInitialDataReady, setIsInitialDataReady] = useState<boolean>(false);
 
   // Consultations state
   const [consultations, setConsultations] = useState<ConsultationItem[]>(() => {
@@ -1010,43 +842,28 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   });
 
-  // Client Logos state
-  const [clientLogos, setClientLogos] = useState<ClientLogo[]>(() => {
-    try {
-      const savedV4 = localStorage.getItem('masterlink_client_logos_v4');
-      if (savedV4) {
-        const parsed = JSON.parse(savedV4);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-      return DEFAULT_CLIENT_LOGOS;
-    } catch {
-      return DEFAULT_CLIENT_LOGOS;
-    }
-  });
+  // Client Logos state (100% Backend API driven)
+  const [clientLogos, setClientLogos] = useState<ClientLogo[]>([]);
 
-  // Testimonials state
-  const [testimonials, setTestimonials] = useState<TestimonialModel[]>(() => {
-    try {
-      const saved = localStorage.getItem('masterlink_testimonials_v2');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
-      }
-      return DEFAULT_TESTIMONIALS;
-    } catch {
-      return DEFAULT_TESTIMONIALS;
-    }
-  });
+  // Testimonials state (100% Backend API driven)
+  const [testimonials, setTestimonials] = useState<TestimonialModel[]>([]);
 
-  // Media Library state
-  const [mediaItems, setMediaItems] = useState<MediaLibraryItem[]>(() => {
+  // Media Library state (100% Backend API driven)
+  const [mediaItems, setMediaItems] = useState<MediaLibraryItem[]>([]);
+
+  // Dashboard Stats state (100% Backend API driven)
+  const [dashboardStats, setDashboardStats] = useState<DashboardStatsResponse | null>(null);
+
+  const refreshDashboardStats = useCallback(async () => {
     try {
-      const saved = localStorage.getItem('masterlink_media_library_v1');
-      return saved ? JSON.parse(saved) : DEFAULT_MEDIA_ITEMS;
-    } catch {
-      return DEFAULT_MEDIA_ITEMS;
+      const res = await adminDashboardApi.getStats();
+      if (res && res.data) {
+        setDashboardStats(res.data);
+      }
+    } catch (err) {
+      console.warn('DataContext: Could not refresh dashboard stats from API:', err);
     }
-  });
+  }, []);
 
   // Auto-save to localStorage whenever state changes
   useEffect(() => {
@@ -1061,9 +878,7 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     safeSetLocalStorage('masterlink_posts', posts);
   }, [posts]);
 
-  useEffect(() => {
-    safeSetLocalStorage('masterlink_settings_v3', settings);
-  }, [settings]);
+  // Settings state is 100% MySQL + Laravel API driven (no localStorage auto-save)
 
   useEffect(() => {
     safeSetLocalStorage('masterlink_consultations', consultations);
@@ -1073,46 +888,66 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
     safeSetLocalStorage('masterlink_client_logos_v4', clientLogos);
   }, [clientLogos]);
 
-  useEffect(() => {
-    safeSetLocalStorage('masterlink_testimonials_v2', testimonials);
-  }, [testimonials]);
-
-  useEffect(() => {
-    safeSetLocalStorage('masterlink_media_library_v1', mediaItems);
-  }, [mediaItems]);
-
-  // Initial Sync from Laravel API on App Launch (Single Source of Truth)
-  useEffect(() => {
-    let isMounted = true;
-
-    apiService.getServices().then(data => {
-      if (isMounted && Array.isArray(data)) {
-        setServices(data);
+  const refreshMedia = useCallback(async () => {
+    try {
+      const res = await adminMediaApi.getAll({ per_page: 100 });
+      if (res && Array.isArray(res.data)) {
+        const mapped: MediaLibraryItem[] = res.data.map(m => ({
+          id: String(m.id),
+          name: m.file_name,
+          type: (m.media_type as 'image' | 'video' | 'document' | 'audio') || 'image',
+          mimeType: m.mime_type || '',
+          sizeBytes: m.file_size,
+          url: m.url,
+          date: m.created_at ? m.created_at.split('T')[0] : new Date().toISOString().split('T')[0],
+          altText: m.alt_text || '',
+        }));
+        setMediaItems(mapped);
       }
-    }).catch(err => {
-      console.warn('DataContext: Failed to fetch live services from Laravel:', err);
-    });
-
-    apiService.getProjects().then(data => {
-      if (isMounted && Array.isArray(data)) {
-        setProjects(data);
-      }
-    }).catch(err => {
-      console.warn('DataContext: Failed to fetch live projects from Laravel:', err);
-    });
-
-    apiService.getClientLogos().then(data => {
-      if (isMounted && Array.isArray(data)) {
-        setClientLogos(data);
-      }
-    }).catch(err => {
-      console.warn('DataContext: Failed to fetch live client logos from Laravel:', err);
-    });
-
-    return () => {
-      isMounted = false;
-    };
+    } catch (err) {
+      console.warn('DataContext: Could not refresh media items from Laravel API:', err);
+    }
   }, []);
+
+  const refreshTestimonials = useCallback(async () => {
+    try {
+      let items: LaravelTestimonial[] = [];
+      try {
+        const publicRes = await publicTestimonialsApi.getAll();
+        items = publicRes.data || [];
+      } catch {
+        const adminRes = await adminTestimonialsApi.getAll();
+        items = Array.isArray(adminRes.data) ? adminRes.data : [];
+      }
+
+      if (Array.isArray(items)) {
+        const mapped: TestimonialModel[] = items.map(t => ({
+          id: String(t.id),
+          display_name: t.display_name,
+          display_name_ar: t.display_name,
+          message: t.message,
+          message_ar: t.message,
+          sort_order: t.sort_order ?? 0,
+          is_active: Boolean(t.is_active),
+          media_id: t.media_id ? String(t.media_id) : undefined,
+          media: t.media ? {
+            id: String(t.media.id),
+            file_path: t.media.url,
+            url: t.media.url,
+            file_name: t.media.file_name,
+            alt_text: t.media.alt_text || t.media.file_name
+          } : undefined,
+          created_at: t.created_at,
+          updated_at: t.updated_at
+        }));
+        setTestimonials(mapped);
+      }
+    } catch (err) {
+      console.warn('DataContext: Could not refresh testimonials from Laravel API:', err);
+    }
+  }, []);
+
+
 
   // Service operations
   const addService = (service: ServiceItem) => {
@@ -1160,44 +995,132 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const refreshSettings = useCallback(async () => {
     try {
-      const response = await adminSiteSettingsApi.getAll();
-      const items = response.data || [];
+      let items: any[] = [];
+      try {
+        const publicRes = await publicSiteSettingsApi.getAll();
+        items = publicRes.data || [];
+      } catch {
+        const adminRes = await adminSiteSettingsApi.getAll();
+        items = adminRes.data || [];
+      }
+
       if (Array.isArray(items) && items.length > 0) {
         setSettings(prev => {
           const updated: Partial<SettingsState> = {};
+          const settingsDict: Record<string, string> = {};
+
           items.forEach(item => {
-            if (item.key === 'site_logo') updated.siteLogo = item.value || '';
-            if (item.key === 'company_logo') updated.companyLogo = item.value || '';
-            if (item.key === 'site_name') {
-              updated.companyNameAr = item.value || prev.companyNameAr;
-              updated.companyNameEn = item.value || prev.companyNameEn;
-            }
-            if (item.key === 'company_email') updated.companyEmail = item.value || prev.companyEmail;
-            if (item.key === 'company_phone') updated.companyPhone = item.value || prev.companyPhone;
-            if (item.key === 'company_address') {
-              updated.companyAddressAr = item.value || prev.companyAddressAr;
-              updated.companyAddressEn = item.value || prev.companyAddressEn;
-            }
-            if (item.key === 'working_hours') {
-              updated.workingHoursAr = item.value || prev.workingHoursAr;
-              updated.workingHoursEn = item.value || prev.workingHoursEn;
-            }
-            if (item.key === 'about_company') {
-              updated.aboutCompanyAr = item.value || prev.aboutCompanyAr;
-              updated.aboutCompanyEn = item.value || prev.aboutCompanyEn;
+            if (item.key) {
+              settingsDict[item.key] = item.value || '';
             }
           });
-          return { ...prev, ...updated };
+
+          items.forEach(item => {
+            if (!item.key) return;
+            const val = item.value || '';
+
+            if (item.key === 'site_logo') {
+              updated.siteLogo = val;
+              updated.companyLogo = val;
+            }
+            if (item.key === 'company_logo' && !updated.siteLogo) {
+              updated.companyLogo = val;
+              updated.siteLogo = val;
+            }
+            if (item.key === 'site_name') {
+              updated.companyNameAr = val;
+              updated.companyNameEn = val;
+              updated.siteName = val;
+            }
+            if (item.key === 'company_email') updated.companyEmail = val;
+            if (item.key === 'company_phone') updated.companyPhone = val;
+            if (item.key === 'company_address') {
+              updated.companyAddressAr = val;
+              updated.companyAddressEn = val;
+            }
+            if (item.key === 'working_hours') {
+              updated.workingHoursAr = val;
+              updated.workingHoursEn = val;
+            }
+            if (item.key === 'about_company') {
+              updated.aboutCompanyAr = val;
+              updated.aboutCompanyEn = val;
+            }
+          });
+
+          const socialMap: Array<{ platform: SocialLinkItem['platform']; keys: string[] }> = [
+            { platform: 'twitter', keys: ['x_url', 'twitter_url'] },
+            { platform: 'facebook', keys: ['facebook_url'] },
+            { platform: 'instagram', keys: ['instagram_url'] },
+            { platform: 'linkedin', keys: ['linkedin_url'] },
+            { platform: 'youtube', keys: ['youtube_url'] },
+            { platform: 'github', keys: ['github_url'] }
+          ];
+
+          const updatedSocials: SocialLinkItem[] = [];
+          socialMap.forEach((spec, idx) => {
+            const foundKey = spec.keys.find(k => k in settingsDict && settingsDict[k] && settingsDict[k].trim() !== '');
+            if (foundKey) {
+              const url = settingsDict[foundKey].trim();
+              if (url && url !== '#') {
+                updatedSocials.push({
+                  id: `soc-${idx + 1}`,
+                  platform: spec.platform,
+                  url: url
+                });
+              }
+            }
+          });
+
+          return { ...prev, ...updated, socials: updatedSocials };
         });
       }
     } catch (err) {
       console.warn('Could not refresh site settings from Laravel API:', err);
+    } finally {
+      setIsSettingsLoaded(true);
     }
   }, []);
 
+  // Coordinated Initial Data Fetch — Single Source of Truth from Laravel API
   useEffect(() => {
-    refreshSettings();
-  }, [refreshSettings]);
+    let cancelled = false;
+
+    async function initializePublicData() {
+      await Promise.allSettled([
+        apiService.getServices().then(data => {
+          if (!cancelled && Array.isArray(data)) setServices(data);
+        }).catch(err => {
+          console.warn('DataContext: Failed to fetch services:', err);
+        }),
+        apiService.getProjects().then(data => {
+          if (!cancelled && Array.isArray(data)) setProjects(data);
+        }).catch(err => {
+          console.warn('DataContext: Failed to fetch projects:', err);
+        }),
+        apiService.getProjectCategories().then(data => {
+          if (!cancelled && Array.isArray(data)) setProjectCategories(data);
+        }).catch(err => {
+          console.warn('DataContext: Failed to fetch project categories:', err);
+        }),
+        apiService.getClientLogos().then(data => {
+          if (!cancelled && Array.isArray(data)) setClientLogos(data);
+        }).catch(err => {
+          console.warn('DataContext: Failed to fetch client logos:', err);
+        }),
+        refreshTestimonials(),
+        refreshSettings()
+      ]);
+
+      if (!cancelled) {
+        setIsInitialDataReady(true);
+      }
+    }
+
+    initializePublicData();
+
+    return () => { cancelled = true; };
+  }, [refreshTestimonials, refreshSettings]);
 
   // Consultation operations
   const addConsultation = (item: Omit<ConsultationItem, 'id' | 'date' | 'status'>) => {
@@ -1266,8 +1189,11 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
       value={{
         services,
         projects,
+        projectCategories,
         posts,
         settings,
+        isSettingsLoaded,
+        isInitialDataReady,
         consultations,
         clientLogos,
         testimonials,
@@ -1301,9 +1227,12 @@ export const DataProvider: React.FC<{ children: React.ReactNode }> = ({ children
         updateTestimonial,
         deleteTestimonial,
         restoreTestimonial,
+        refreshTestimonials,
         setMediaItems,
         addMediaItem,
-        deleteMediaItem
+        deleteMediaItem,
+        dashboardStats,
+        refreshDashboardStats
       }}
     >
       {children}

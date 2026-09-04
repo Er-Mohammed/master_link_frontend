@@ -127,24 +127,14 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
   };
 
   // Access central data store
-  const { consultations, setConsultations, addTestimonial } = useData();
+  const { consultations, setConsultations, addTestimonial, dashboardStats, refreshDashboardStats, projectCategories } = useData();
 
-  const [realProjectsCount, setRealProjectsCount] = useState<number | null>(null);
   const [newConsultations, setNewConsultations] = useState<LaravelConsultation[]>([]);
   const [newConsultationsLoading, setNewConsultationsLoading] = useState<boolean>(true);
 
   useEffect(() => {
-    adminProjectsApi.getAll({ per_page: 1 }).then(res => {
-      if (res.meta?.total !== undefined) {
-        setRealProjectsCount(res.meta.total);
-      } else if (Array.isArray(res.data)) {
-        setRealProjectsCount(res.data.length);
-      }
-    }).catch(() => {});
-  }, []);
-
-  useEffect(() => {
     if (activeTab === 'dashboard') {
+      refreshDashboardStats();
       setNewConsultationsLoading(true);
       adminConsultationsApi.getAll({
         status: 'new',
@@ -161,58 +151,15 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
         setNewConsultationsLoading(false);
       });
     }
-  }, [activeTab]);
+  }, [activeTab, refreshDashboardStats]);
 
-  const [projects, setProjects] = useState([
-    { 
-      id: 'PRJ-101', 
-      nameEn: 'Al-Rajhi Digital Core', 
-      nameAr: 'نواة الراجحي الرقمية', 
-      categoryEn: 'FinTech Platform', 
-      categoryAr: 'منصات التكنولوجيا المالية', 
-      clientEn: 'Al-Rajhi Bank', 
-      clientAr: 'مصرف الراجحي', 
-      date: '2026-05-12', 
-      featured: true, 
-      img: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?auto=format&fit=crop&w=400&q=80' 
-    },
-    { 
-      id: 'PRJ-102', 
-      nameEn: 'Aramco Telemetry Suite', 
-      nameAr: 'منظومة قياس وربط أرامكو', 
-      categoryEn: 'Telemetry & IoT', 
-      categoryAr: 'إنترنت الأشياء والقياس والتحكم', 
-      clientEn: 'Saudi Aramco', 
-      clientAr: 'أرامكو السعودية', 
-      date: '2026-04-30', 
-      featured: true, 
-      img: 'https://images.unsplash.com/photo-1518770660439-4636190af475?auto=format&fit=crop&w=400&q=80' 
-    },
-    { 
-      id: 'PRJ-103', 
-      nameEn: 'NEOM Smart Port App', 
-      nameAr: 'تطبيق ميناء نيوم الذكي', 
-      categoryEn: 'Mobile Engineering', 
-      categoryAr: 'هندسة تطبيقات الهواتف', 
-      clientEn: 'NEOM Authority', 
-      clientAr: 'سلطة نيوم', 
-      date: '2026-06-15', 
-      featured: false, 
-      img: 'https://images.unsplash.com/photo-1526304640581-d334cdbbf45e?auto=format&fit=crop&w=400&q=80' 
-    }
-  ]);
-
-  const [articles, setArticles] = useState([
-    { id: 'ART-201', titleEn: 'Scaling Microservices with MasterLink Engine', titleAr: 'توسيع الخدمات المصغرة باستخدام محرك ماستر لينك', date: '2026-07-15', authorEn: 'Eng. Ala\'a', authorAr: 'م. علاء الحربي', status: 'published', img: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=150&q=80' },
-    { id: 'ART-202', titleEn: 'The Future of Zero-Trust Network Topologies', titleAr: 'مستقبل توبولوجيا الشبكات صفرية الثقة', date: '2026-07-10', authorEn: 'Dr. Sarah', authorAr: 'د. سارة العتيبي', status: 'draft', img: 'https://images.unsplash.com/photo-1510511459019-5dda7724fd87?auto=format&fit=crop&w=150&q=80' },
-    { id: 'ART-203', titleEn: 'Optimizing Firestore Queries for Enterprise Scale', titleAr: 'تحسين استعلامات فايرستور للمؤسسات الكبرى', date: '2026-06-28', authorEn: 'Eng. Khaled', authorAr: 'م. خالد منصور', status: 'published', img: 'https://images.unsplash.com/photo-1544383835-bda2bc66a55d?auto=format&fit=crop&w=150&q=80' }
-  ]);
-
-  const [services, setServices] = useState([
-    { id: 'SRV-01', titleEn: 'Custom SaaS & Cloud Systems', titleAr: 'أنظمة السحابة والبرمجيات المخصصة', status: 'active', speed: '99.98% Uptime', code: 'CLOUD-CORE' },
-    { id: 'SRV-02', titleEn: 'Full-Scale Enterprise ERPs', titleAr: 'أنظمة إدارة موارد المؤسسات المتكاملة', status: 'active', speed: '99.95% Stable', code: 'ERP-SYSTEM' },
-    { id: 'SRV-03', titleEn: 'High-Scale Telemetry Routing', titleAr: 'أنظمة توجيه ومعالجة البيانات الفورية', status: 'active', speed: '12ms Latency', code: 'TELEMETRY' }
-  ]);
+  const formatBytes = (bytes: number): string => {
+    if (!bytes || bytes <= 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+  };
 
   // Real-time System Infrastructure Health State & Diagnostic Runner
   const [isCheckingSystemHealth, setIsCheckingSystemHealth] = useState(false);
@@ -314,40 +261,48 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
     triggerToast(language === 'en' ? 'Client testimonial comment added successfully' : 'تمت إضافة تعليق ورأي العميل بنجاح');
   };
 
-  const handleAddProject = (e: React.FormEvent) => {
+  const handleAddProject = async (e: React.FormEvent) => {
     e.preventDefault();
-    const finalName = newPrjNameEn || newPrjNameAr;
+    const finalName = newPrjNameEn.trim() || newPrjNameAr.trim();
     if (!finalName) {
       triggerToast(language === 'en' ? 'Project name is required' : 'اسم المشروع مطلوب');
       return;
     }
-    const finalClient = newPrjClientEn || newPrjClientAr || 'MasterLink Partner';
-    const finalCategory = newPrjCategoryEn || newPrjCategoryAr || 'Software Solution';
+    const finalClient = newPrjClientEn.trim() || newPrjClientAr.trim() || 'MasterLink Partner';
+    const cleanSlug = finalName
+      .toLowerCase()
+      .replace(/[^a-z0-9\-_]+/g, '-')
+      .replace(/^-+|-+$/g, '') || `project-${Date.now()}`;
+    const categoryId = projectCategories && projectCategories.length > 0 ? Number(projectCategories[0].id) : 1;
 
-    const newPrj = {
-      id: `PRJ-${Math.floor(100 + Math.random() * 900)}`,
-      nameEn: finalName,
-      nameAr: finalName,
-      categoryEn: finalCategory,
-      categoryAr: finalCategory,
-      clientEn: finalClient,
-      clientAr: finalClient,
-      date: new Date().toISOString().split('T')[0],
-      featured: true,
-      img: 'https://images.unsplash.com/photo-1507238691740-187a5b1d37b8?auto=format&fit=crop&w=400&q=80'
-    };
-    setProjects([newPrj, ...projects]);
-    setActiveModal(null);
-    setNewPrjNameEn('');
-    setNewPrjNameAr('');
-    setNewPrjClientEn('');
-    setNewPrjClientAr('');
-    setNewPrjCategoryEn('');
-    setNewPrjCategoryAr('');
-    triggerToast(language === 'en' ? 'Enterprise project successfully added to the index' : 'تم إضافة المشروع الرقمي بنجاح إلى الفهرس');
+    try {
+      await adminProjectsApi.create({
+        category_id: categoryId,
+        title: finalName,
+        slug: cleanSlug,
+        client_name: finalClient,
+        short_description: newPrjNameAr ? `${finalName} - مشروع رقمي متكامل` : `${finalName} - Enterprise Digital Project`,
+        is_featured: true,
+        is_active: true
+      });
+
+      setActiveModal(null);
+      setNewPrjNameEn('');
+      setNewPrjNameAr('');
+      setNewPrjClientEn('');
+      setNewPrjClientAr('');
+      setNewPrjCategoryEn('');
+      setNewPrjCategoryAr('');
+
+      await refreshDashboardStats();
+      triggerToast(language === 'en' ? 'Enterprise project successfully added to the index' : 'تم إضافة المشروع الرقمي بنجاح إلى الفهرس');
+    } catch (err: any) {
+      console.error('Failed to create project via Quick Action:', err);
+      triggerToast(language === 'en' ? 'Failed to create project' : 'فشل إضافة المشروع', 'info');
+    }
   };
 
-  const handleAddService = (e: React.FormEvent) => {
+  const handleAddService = async (e: React.FormEvent) => {
     e.preventDefault();
     const finalTitle = newSrvTitleAr.trim() || newSrvTitleEn.trim();
     if (!finalTitle) {
@@ -359,31 +314,27 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
       .replace(/[^a-z0-9\-_]+/g, '-')
       .replace(/^-+|-+$/g, '') || `service-${Date.now()}`;
 
-    const newSrv = {
-      id: cleanSlug,
-      nameEn: newSrvTitleEn.trim() || finalTitle,
-      nameAr: newSrvTitleAr.trim() || finalTitle,
-      title: finalTitle,
-      descriptionEn: 'High-quality digital and technology solutions tailored to your business needs.',
-      descriptionAr: 'حلول تقنية وبرمجية متكاملة مصممة خصيصاً لتلبية متطلبات أعمالك ونموها.',
-      shortDescription: 'حلول تقنية وبرمجية متكاملة مصممة خصيصاً لتلبية متطلبات أعمالك ونموها.',
-      slug: cleanSlug,
-      displayOrder: services.length + 1,
-      sortOrder: services.length + 1,
-      status: 'active' as const,
-      isActive: true,
-      iconName: 'Code2',
-      coverImage: 'https://images.unsplash.com/photo-1451187580459-43490279c0fa?auto=format&fit=crop&w=600&q=80',
-      createdAt: new Date().toISOString().split('T')[0],
-      featuresEn: ['End-to-end Architecture', 'Cloud Deployment', '24/7 SLA Support'],
-      featuresAr: ['هيكلية برمجية متطورة', 'استضافة سحابية آمنة', 'دعم فني مستمر 24/7']
-    };
-    setServices([newSrv, ...services]);
-    setActiveModal(null);
-    setNewSrvTitleEn('');
-    setNewSrvTitleAr('');
-    setNewSrvCode('');
-    triggerToast(language === 'en' ? 'New service tier online and live' : 'تم تفعيل الخدمة البرمجية الجديدة بنجاح');
+    try {
+      await adminServicesApi.create({
+        title: finalTitle,
+        slug: cleanSlug,
+        short_description: 'حلول تقنية وبرمجية متكاملة مصممة خصيصاً لتلبية متطلبات أعمالك ونموها.',
+        full_description: 'حلول تقنية وبرمجية متكاملة مصممة خصيصاً لتلبية متطلبات أعمالك ونموها.',
+        is_active: true,
+        sort_order: 1
+      });
+
+      setActiveModal(null);
+      setNewSrvTitleEn('');
+      setNewSrvTitleAr('');
+      setNewSrvCode('');
+
+      await refreshDashboardStats();
+      triggerToast(language === 'en' ? 'New service tier online and live' : 'تم تفعيل الخدمة البرمجية الجديدة بنجاح');
+    } catch (err: any) {
+      console.error('Failed to create service via Quick Action:', err);
+      triggerToast(language === 'en' ? 'Failed to create service' : 'فشل تفعيل الخدمة', 'info');
+    }
   };
 
   // Localized Labels
@@ -472,7 +423,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
         
         {/* Top Logo and Header Branding */}
         <div className="p-6 border-b border-slate-200/80 flex items-center justify-between">
-          <Logo variant="admin" className="h-10 sm:h-12 max-w-[180px]" imgClassName="h-full w-auto max-w-full object-contain" />
+          <Logo variant="admin" className="w-[160px] sm:w-[180px] h-auto" imgClassName="!w-full !h-auto !max-w-none !max-h-none object-contain" />
         </div>
 
         {/* Sidebar Menu Items */}
@@ -570,7 +521,7 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
               }`}
             >
               <div className="p-6 border-b border-slate-200 flex items-center justify-between">
-                <Logo variant="admin" className="h-10 sm:h-12 max-w-[180px]" imgClassName="h-full w-auto max-w-full object-contain" />
+                <Logo variant="admin" className="w-[150px] sm:w-[170px] h-auto" imgClassName="!w-full !h-auto !max-w-none !max-h-none object-contain" />
                 <button 
                   onClick={() => setIsMobileSidebarOpen(false)}
                   className="p-1.5 rounded-lg bg-slate-100 border border-slate-200 text-slate-500 hover:text-slate-900 cursor-pointer"
@@ -719,11 +670,60 @@ export function AdminDashboard({ onLogout }: AdminDashboardProps) {
               {/* FIVE STATS CARDS (Bento Grid) */}
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-3.5 sm:gap-5">
                 {[
-                  { titleEn: 'Services', titleAr: 'الخدمات الرقمية', value: services.length, icon: Briefcase, color: 'text-rose-500 bg-rose-50', change: '+1 New', descEn: 'Commercial solutions', descAr: 'الحلول البرمجية المعروضة' },
-                  { titleEn: 'Projects', titleAr: 'المشاريع الحية', value: realProjectsCount ?? projects.length, icon: FileText, color: 'text-blue-500 bg-blue-50', change: '+2 Active', descEn: 'Production deployments', descAr: 'عمليات النشر السحابية' },
-                  { titleEn: 'New Consultations', titleAr: 'إشعارات الاستشارات', value: newConsultations.length, icon: MessageSquare, color: 'text-amber-500 bg-amber-50', change: isRtl ? `🔔 ${newConsultations.length} جديدة` : `🔔 ${newConsultations.length} New`, descEn: 'Unprocessed requests', descAr: 'طلبات جديدة قيد الانتظار' },
-                  { titleEn: 'Media Files', titleAr: 'ملفات الوسائط', value: '142', icon: ImageIcon, color: 'text-emerald-500 bg-emerald-50', change: '742 MB Used', descEn: 'Cloud CDN assets', descAr: 'أصول الوسائط الرقمية' },
-                  { titleEn: 'Admins', titleAr: 'المشرفين النشطين', value: '4', icon: Users, color: 'text-slate-500 bg-slate-50', change: 'All online', descEn: 'Zero-trust roles', descAr: 'المدراء بصلاحيات كاملة' }
+                  {
+                    titleEn: 'Services',
+                    titleAr: 'الخدمات الرقمية',
+                    value: dashboardStats !== null ? dashboardStats.services_count : '--',
+                    icon: Briefcase,
+                    color: 'text-rose-500 bg-rose-50',
+                    change: isRtl ? 'خدمات نشطة' : 'Active Catalog',
+                    descEn: 'Commercial solutions',
+                    descAr: 'الحلول البرمجية المعروضة'
+                  },
+                  {
+                    titleEn: 'Projects',
+                    titleAr: 'المشاريع الحية',
+                    value: dashboardStats !== null ? dashboardStats.projects_count : '--',
+                    icon: FileText,
+                    color: 'text-blue-500 bg-blue-50',
+                    change: isRtl ? 'المشاريع الحية' : 'Live Projects',
+                    descEn: 'Production deployments',
+                    descAr: 'عمليات النشر السحابية'
+                  },
+                  {
+                    titleEn: 'New Consultations',
+                    titleAr: 'إشعارات الاستشارات',
+                    value: dashboardStats !== null ? dashboardStats.new_consultations_count : '--',
+                    icon: MessageSquare,
+                    color: 'text-amber-500 bg-amber-50',
+                    change: dashboardStats !== null
+                      ? (isRtl ? `🔔 ${dashboardStats.new_consultations_count} جديدة` : `🔔 ${dashboardStats.new_consultations_count} New`)
+                      : '--',
+                    descEn: 'Unprocessed requests',
+                    descAr: 'طلبات جديدة قيد الانتظار'
+                  },
+                  {
+                    titleEn: 'Media Files',
+                    titleAr: 'ملفات الوسائط',
+                    value: dashboardStats !== null ? dashboardStats.media_count : '--',
+                    icon: ImageIcon,
+                    color: 'text-emerald-500 bg-emerald-50',
+                    change: dashboardStats !== null ? `${formatBytes(dashboardStats.media_total_size)} Used` : '--',
+                    descEn: 'Cloud CDN assets',
+                    descAr: 'أصول الوسائط الرقمية'
+                  },
+                  {
+                    titleEn: 'Admins',
+                    titleAr: 'المشرفين النشطين',
+                    value: dashboardStats !== null ? dashboardStats.admins_count : '--',
+                    icon: Users,
+                    color: 'text-slate-500 bg-slate-50',
+                    change: dashboardStats !== null && dashboardStats.total_admins_count
+                      ? (isRtl ? `${dashboardStats.admins_count} من ${dashboardStats.total_admins_count} نشط` : `${dashboardStats.admins_count}/${dashboardStats.total_admins_count} Active`)
+                      : (isRtl ? 'المدراء النشطين' : 'Active Admins'),
+                    descEn: 'Zero-trust roles',
+                    descAr: 'المدراء بصلاحيات كاملة'
+                  }
                 ].map((stat, idx) => {
                   const Icon = stat.icon;
                   return (

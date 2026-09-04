@@ -91,8 +91,8 @@ export function Navigation({ onOpenConsultation }: NavigationProps) {
           >
             <Logo
               variant="header"
-              className="h-10 sm:h-12 md:h-14 max-w-[180px] sm:max-w-[200px] justify-start"
-              imgClassName="h-full w-auto max-w-full object-contain transition-all duration-300 drop-shadow-sm group-hover:scale-105"
+              className="w-[140px] sm:w-[170px] md:w-[200px] lg:w-[220px] h-auto flex items-center justify-start shrink-0"
+              imgClassName="!w-full !h-auto !max-w-none !max-h-none object-contain object-left group-hover:brightness-110"
             />
           </a>
         </div>

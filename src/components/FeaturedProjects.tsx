@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { ArrowUpRight, ArrowUpLeft, Target, Zap, Sparkles, X, Check, Image as ImageIcon, ChevronLeft, ChevronRight, Play } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { ArrowUpRight, ArrowUpLeft, Sparkles, X, Image as ImageIcon, ChevronLeft, ChevronRight, Play, ExternalLink, Calendar, Building2, Tag } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useLanguage } from '../context/LanguageContext';
 import { useData } from '../context/DataContext';
@@ -126,53 +126,30 @@ interface FeaturedProjectsProps {
 }
 
 export function FeaturedProjects({ onOpenConsultation }: FeaturedProjectsProps) {
-  const [activeCategory, setActiveCategory] = useState('All');
+  const [activeCategory, setActiveCategory] = useState<string>('all');
   const [selectedProjectId, setSelectedProjectId] = useState<string | null>(null);
   const [selectedImageIndex, setSelectedImageIndex] = useState<number>(0);
   const { t, isRtl, language } = useLanguage();
-  const { projects: cmsProjects, services: cmsServices } = useData();
+  const { projects: cmsProjects, projectCategories } = useData();
 
-  // Primary predefined categories with English and Arabic translations
-  const baseCategories = [
-    { key: 'All', id: 'All', nameEn: 'All', nameAr: 'الكل', label: isRtl ? 'الكل' : 'All' },
-    { key: 'Technical Services', id: 'tech-services', nameEn: 'Technical Services', nameAr: 'خدماتنا التقنية', label: isRtl ? 'خدماتنا التقنية' : 'Technical Services' },
-    { key: 'Marketing Services', id: 'marketing-services', nameEn: 'Marketing Services', nameAr: 'خدماتنا التسويقية', label: isRtl ? 'خدماتنا التسويقية' : 'Marketing Services' },
-    { key: 'Advertising & Media', id: 'ads-media-services', nameEn: 'Advertising & Media', nameAr: 'خدماتنا الإعلانية والتصوير', label: isRtl ? 'خدماتنا الإعلانية والتصوير' : 'Advertising & Media' },
-    { key: 'Digital Consulting', id: 'consulting-studies', nameEn: 'Digital Consulting', nameAr: 'استشارات ودراسات رقمية', label: isRtl ? 'استشارات ودراسات رقمية' : 'Digital Consulting' },
-    { key: 'Branding & Identity', id: 'visual-identity-branding', nameEn: 'Branding & Identity', nameAr: 'الشعارات والهويات البصرية', label: isRtl ? 'الشعارات والهويات البصرية' : 'Branding & Identity' },
-    { key: 'AI Production', id: 'ai-production', nameEn: 'AI Production', nameAr: 'الإنتاج بالذكاء الاصطناعي', label: isRtl ? 'الإنتاج بالذكاء الاصطناعي' : 'AI Production' }
-  ];
+  // Dynamic filter tabs constructed from Database projectCategories + 'All'
+  const filterCategories = React.useMemo(() => {
+    const allTab = {
+      id: 'all',
+      name: isRtl ? 'الكل' : 'All'
+    };
+
+    const dbCategories = projectCategories.map(cat => ({
+      id: String(cat.id),
+      name: cat.name,
+      slug: cat.slug
+    }));
+
+    return [allTab, ...dbCategories];
+  }, [projectCategories, isRtl]);
 
   // Filter published active projects from CMS / Laravel DB
   const publishedCmsProjects = cmsProjects.filter(p => p.status === 'published' || (p as any).isActive !== false);
-
-  const dynamicCategories = React.useMemo(() => {
-    const list = [...baseCategories];
-
-    // Add categories from database projects if not already present
-    publishedCmsProjects.forEach(p => {
-      if (p.categoryEn || p.categoryAr) {
-        const catEn = p.categoryEn || p.categoryAr || '';
-        const catAr = p.categoryAr || p.categoryEn || '';
-        const exists = list.some(
-          c => c.nameEn.toLowerCase() === catEn.toLowerCase() || 
-               c.nameAr === catAr || 
-               c.key.toLowerCase() === catEn.toLowerCase()
-        );
-        if (!exists && (catEn || catAr)) {
-          list.push({
-            key: catEn || catAr,
-            id: (catEn || catAr).toLowerCase().replace(/\s+/g, '-'),
-            nameEn: catEn,
-            nameAr: catAr,
-            label: isRtl ? catAr : catEn
-          });
-        }
-      }
-    });
-
-    return list;
-  }, [cmsProjects, cmsServices, isRtl]);
 
   // Map CMS published projects cleanly from database including both images and videos
   const formattedProjects = publishedCmsProjects.map(p => {
@@ -201,59 +178,67 @@ export function FeaturedProjects({ onOpenConsultation }: FeaturedProjectsProps) 
     const projectImages = mediaItems.map(m => m.url);
     const primaryImage = primaryMedia ? primaryMedia.url : '';
 
+    const fullDesc = (language === 'ar' ? p.fullDescriptionAr : p.fullDescriptionEn) || (p as any).full_description || '';
+    const shortDesc = (language === 'ar' ? p.descriptionAr : p.descriptionEn) || (p as any).short_description || '';
+    const mainDesc = (fullDesc.trim() || shortDesc.trim());
+
+    const clientName = (p.clientAr || p.clientEn || p.clientName || (p as any).client_name || '').trim();
+    const projectUrl = (p.projectUrl || (p as any).project_url || '').trim();
+    const completionDate = (p.completionDate || p.date || (p as any).completion_date || '').trim();
+    const projectServices = (p.services && p.services.length > 0) ? p.services : (p.tags && p.tags.length > 0 ? p.tags : []);
+
+    const rawCategory = (p as any).rawCategory || (p as any).category;
+    const categoryId = p.categoryId !== undefined ? String(p.categoryId) : (rawCategory?.id ? String(rawCategory.id) : '');
+
     return {
       id: p.id,
+      categoryId,
+      rawCategory,
       title: (language === 'ar' ? (p.titleAr || p.nameAr) : (p.titleEn || p.nameEn)) || '',
-      category: (language === 'ar' ? p.categoryAr : p.categoryEn) || p.categoryAr || p.categoryEn || '',
+      category: rawCategory?.name || (language === 'ar' ? p.categoryAr : p.categoryEn) || p.categoryAr || p.categoryEn || '',
       categoryEn: p.categoryEn || '',
       categoryAr: p.categoryAr || '',
-      description: (language === 'ar' ? p.descriptionAr : p.descriptionEn) || '',
-      fullDescription: (language === 'ar' ? (p.fullDescriptionAr || p.descriptionAr) : (p.fullDescriptionEn || p.descriptionEn)) || '',
+      description: shortDesc,
+      mainDescription: mainDesc,
       image: primaryImage,
       images: projectImages,
       mediaItems: mediaItems,
       primaryMedia: primaryMedia,
-      stats: {
-        label: language === 'ar' ? 'إنجاز' : 'Metric',
-        value: (language === 'ar' ? p.statsAr : p.statsEn) || (language === 'ar' ? 'أداء ممتاز' : 'High Performance')
-      },
-      tags: p.tags || p.services || [],
-      challenge: language === 'ar' ? 'تحقيق أعلى مستويات الأمان والأداء السلس للمستخدمين.' : 'Achieving peak performance, responsive design, and high security.',
-      strategy: language === 'ar' ? 'تصميم بنية برمجية متطورة باستخدام أحدث إطارات العمل.' : 'Engineered bespoke frontend and backend architecture.',
-      results: (language === 'ar' ? p.statsAr : p.statsEn) || ''
+      clientName: clientName,
+      projectUrl: projectUrl,
+      completionDate: completionDate,
+      services: projectServices,
+      featured: p.featured,
+      tags: projectServices
     };
   });
 
-  // Category filter matching logic
+  // Reset media index whenever selectedProjectId changes
+  useEffect(() => {
+    setSelectedImageIndex(0);
+  }, [selectedProjectId]);
+
+  // Dynamic category filtering matching logic strictly by ID / Slug
   const filteredProjects = React.useMemo(() => {
-    if (activeCategory === 'All' || activeCategory === 'all') {
+    if (activeCategory === 'all') {
       return formattedProjects;
     }
 
-    const selectedCatObj = dynamicCategories.find(c => c.key === activeCategory || c.id === activeCategory);
+    const selectedCat = projectCategories.find(c => String(c.id) === activeCategory);
 
     return formattedProjects.filter(p => {
-      const pCatEn = (p.categoryEn || p.category || '').toLowerCase();
-      const pCatAr = (p.categoryAr || p.category || '').toLowerCase();
-      const pTags = (p.tags || []).map(t => t.toLowerCase());
-
-      const targetKey = activeCategory.toLowerCase();
-      const targetNameEn = (selectedCatObj?.nameEn || '').toLowerCase();
-      const targetNameAr = (selectedCatObj?.nameAr || '').toLowerCase();
-      const targetLabel = (selectedCatObj?.label || '').toLowerCase();
-
-      return (
-        pCatEn === targetKey ||
-        pCatAr === targetKey ||
-        (targetNameEn && pCatEn === targetNameEn) ||
-        (targetNameAr && pCatAr === targetNameAr) ||
-        (targetLabel && (pCatEn === targetLabel || pCatAr === targetLabel)) ||
-        pCatEn.includes(targetKey) ||
-        pCatAr.includes(targetKey) ||
-        pTags.some(tag => tag === targetKey || tag.includes(targetKey) || (targetNameAr && tag.includes(targetNameAr)))
-      );
+      if (p.categoryId && p.categoryId === activeCategory) {
+        return true;
+      }
+      if (selectedCat && p.rawCategory?.slug && p.rawCategory.slug === selectedCat.slug) {
+        return true;
+      }
+      if (selectedCat && selectedCat.name && (p.category === selectedCat.name || p.categoryEn === selectedCat.name || p.categoryAr === selectedCat.name)) {
+        return true;
+      }
+      return false;
     });
-  }, [activeCategory, formattedProjects, dynamicCategories]);
+  }, [activeCategory, formattedProjects, projectCategories]);
 
   const selectedProject = formattedProjects.find(p => p.id === selectedProjectId);
 
@@ -262,14 +247,6 @@ export function FeaturedProjects({ onOpenConsultation }: FeaturedProjectsProps) 
         ? selectedProject.mediaItems[selectedImageIndex] || selectedProject.mediaItems[0]
         : selectedProject.primaryMedia)
     : null;
-
-  const resultsList = selectedProject?.results
-    ? selectedProject.results.split('.').map(s => s.trim()).filter(Boolean)
-    : [
-        isRtl ? 'نمو كبير في نسب تحويل المستخدمين النشطين.' : 'Substantial growth in active user conversion scores.',
-        isRtl ? 'الحصول على درجة سرعة Lighthouse كاملة ١٠٠.' : 'Flawless Lighthouse speed matrix score of 100.',
-        isRtl ? 'تحقيق انتشار ورؤية مؤسسية أوسع.' : 'Secured major corporate visibility index scaling.'
-      ];
 
   return (
     <section id="portfolio" className="py-20 md:py-28 bg-white relative overflow-hidden text-slate-900">
@@ -294,18 +271,18 @@ export function FeaturedProjects({ onOpenConsultation }: FeaturedProjectsProps) 
 
           {/* Filtering Tabs */}
           <div className={`flex flex-wrap gap-1.5 bg-white p-1.5 rounded-2xl border border-[#E5E7EB] shadow-xs self-start md:self-auto ${isRtl ? 'flex-row-reverse' : ''}`}>
-            {dynamicCategories.map(cat => (
+            {filterCategories.map(cat => (
               <button
-                key={cat.key}
-                id={`filter-btn-${cat.key.toLowerCase().replace(/\s+/g, '-')}`}
-                onClick={() => setActiveCategory(cat.key)}
+                key={cat.id}
+                id={`filter-btn-${cat.id}`}
+                onClick={() => setActiveCategory(cat.id)}
                 className={`px-3.5 py-1.5 text-[11px] font-bold rounded-xl transition-all duration-200 cursor-pointer ${
-                  activeCategory === cat.key
+                  activeCategory === cat.id
                     ? 'bg-gradient-to-r from-[#F20530] to-[#F20544] text-white shadow-md shadow-[#F20530]/20'
                     : 'text-[#6B7280] hover:text-[#111827] hover:bg-[#F5F9FF]'
                 }`}
               >
-                {cat.label}
+                {cat.name}
               </button>
             ))}
           </div>
@@ -344,6 +321,7 @@ export function FeaturedProjects({ onOpenConsultation }: FeaturedProjectsProps) 
                           src={project.primaryMedia.url}
                           alt={project.title}
                           loading="lazy"
+                          decoding="async"
                           referrerPolicy="no-referrer"
                           className="object-cover w-full h-full scale-105 group-hover:scale-120"
                           transition={{ duration: 0.6, ease: [0.16, 1, 0.3, 1] }}
@@ -380,14 +358,23 @@ export function FeaturedProjects({ onOpenConsultation }: FeaturedProjectsProps) 
                       </div>
                     )}
 
-                    {/* Statistics overlay */}
-                    <div className={`absolute bottom-4 ${isRtl ? 'left-4' : 'right-4'}`}>
-                      <div className="bg-[#0F172A]/85 backdrop-blur-sm text-white px-3.5 py-1.5 rounded-2xl border border-white/10 flex items-center gap-1.5 shadow-md">
-                        <div className="w-1.5 h-1.5 rounded-full bg-[#2EDFF2]" />
-                        <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-slate-300">{project.stats.label}:</span>
-                        <span className="text-xs font-extrabold font-mono text-[#2EDFF2]">{project.stats.value}</span>
+                    {/* Project Data Overlay Pill */}
+                    {(project.clientName || project.completionDate) && (
+                      <div className={`absolute bottom-4 ${isRtl ? 'left-4' : 'right-4'}`}>
+                        <div className="bg-[#0F172A]/85 backdrop-blur-sm text-white px-3.5 py-1.5 rounded-2xl border border-white/10 flex items-center gap-1.5 shadow-md">
+                          <div className="w-1.5 h-1.5 rounded-full bg-[#2EDFF2]" />
+                          {project.clientName && (
+                            <span className="text-xs font-extrabold text-[#2EDFF2]">{project.clientName}</span>
+                          )}
+                          {project.clientName && project.completionDate && (
+                            <span className="text-[10px] text-slate-400">•</span>
+                          )}
+                          {project.completionDate && (
+                            <span className="text-[10px] font-mono text-slate-300">{project.completionDate}</span>
+                          )}
+                        </div>
                       </div>
-                    </div>
+                    )}
                   </div>
 
                   {/* Info Container */}
@@ -534,52 +521,92 @@ export function FeaturedProjects({ onOpenConsultation }: FeaturedProjectsProps) 
               {/* Case Study details */}
               <div className={`p-6 md:p-8 space-y-6 overflow-y-auto flex-1 ${isRtl ? 'text-right' : 'text-left'}`}>
                 
-                {/* Challenge & Strategy */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* 1. Main Project Description */}
+                {selectedProject.mainDescription && (
                   <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-rose-600 font-bold text-xs uppercase tracking-wider justify-start">
-                      <Target className="w-4 h-4" />
-                      {t.caseStudyChallenge}
-                    </div>
-                    <p className="text-xs text-slate-600 leading-relaxed font-normal">
-                      {selectedProject.challenge}
+                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-400">
+                      {isRtl ? 'تفاصيل المشروع' : 'Project Overview'}
+                    </h4>
+                    <p className="text-xs sm:text-sm text-slate-700 leading-relaxed font-normal whitespace-pre-line">
+                      {selectedProject.mainDescription}
                     </p>
                   </div>
+                )}
 
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2 text-rose-600 font-bold text-xs uppercase tracking-wider justify-start">
-                      <Zap className="w-4 h-4 animate-pulse" />
-                      {t.caseStudyStrategy}
-                    </div>
-                    <p className="text-xs text-slate-600 leading-relaxed font-normal">
-                      {selectedProject.strategy}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Metrics / Results Checklist */}
-                <div className="bg-slate-50 border border-slate-100 rounded-2xl p-5 space-y-3">
-                  <h5 className="text-[10px] font-bold uppercase tracking-widest text-slate-400">{t.caseStudyResults}</h5>
-                  <div className="space-y-2.5">
-                    {resultsList.map((result, i) => (
-                      <div key={i} className={`flex items-start gap-2.5 ${isRtl ? 'flex-row-reverse' : ''}`}>
-                        <div className="w-4 h-4 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 mt-0.5">
-                          <Check className="w-3 h-3 stroke-[3]" />
+                {/* 2. Project Metadata Grid (Client, Date, Category, URL) */}
+                {(selectedProject.clientName || selectedProject.completionDate || selectedProject.category || selectedProject.projectUrl) && (
+                  <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4 sm:p-5 space-y-3">
+                    <h4 className="text-[10px] font-black uppercase tracking-wider text-slate-400">
+                      {isRtl ? 'معلومات المشروع' : 'Project Information'}
+                    </h4>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                      {selectedProject.clientName && (
+                        <div className="flex items-center gap-2.5 text-slate-700">
+                          <div className="w-8 h-8 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center text-[#F20530] shrink-0">
+                            <Building2 className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 block font-bold">{isRtl ? 'العميل' : 'Client'}</span>
+                            <span className="font-extrabold text-slate-900">{selectedProject.clientName}</span>
+                          </div>
                         </div>
-                        <span className="text-xs font-semibold text-slate-700 leading-normal">{result}</span>
-                      </div>
-                    ))}
-                  </div>
-                </div>
+                      )}
 
-                {/* Tags */}
-                {selectedProject.tags && selectedProject.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-1 pt-2 border-t border-slate-100">
-                    {selectedProject.tags.map(tag => (
-                      <span key={tag} className="px-2.5 py-1 bg-slate-100 text-slate-600 rounded text-[9px] font-bold">
-                        {tag}
-                      </span>
-                    ))}
+                      {selectedProject.completionDate && (
+                        <div className="flex items-center gap-2.5 text-slate-700">
+                          <div className="w-8 h-8 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center text-[#F20530] shrink-0">
+                            <Calendar className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 block font-bold">{isRtl ? 'تاريخ التسليم' : 'Completion Date'}</span>
+                            <span className="font-extrabold text-slate-900">{selectedProject.completionDate}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {selectedProject.category && (
+                        <div className="flex items-center gap-2.5 text-slate-700">
+                          <div className="w-8 h-8 rounded-xl bg-rose-50 border border-rose-100 flex items-center justify-center text-[#F20530] shrink-0">
+                            <Tag className="w-4 h-4" />
+                          </div>
+                          <div>
+                            <span className="text-[10px] text-slate-400 block font-bold">{isRtl ? 'القسم' : 'Category'}</span>
+                            <span className="font-extrabold text-slate-900">{selectedProject.category}</span>
+                          </div>
+                        </div>
+                      )}
+
+                      {selectedProject.projectUrl && (
+                        <div className="flex items-center sm:col-span-2 pt-2 border-t border-slate-200/60">
+                          <a
+                            href={selectedProject.projectUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-2 px-4 py-2 bg-[#F20530] hover:bg-[#D00428] text-white rounded-xl text-xs font-bold transition-all shadow-xs"
+                          >
+                            <span>{isRtl ? 'زيارة موقع المشروع الحي' : 'Visit Live Project Site'}</span>
+                            <ExternalLink className="w-3.5 h-3.5" />
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. Delivered Services */}
+                {selectedProject.services && selectedProject.services.length > 0 && (
+                  <div className="space-y-2 pt-2 border-t border-slate-100">
+                    <h4 className="text-xs font-black uppercase tracking-wider text-slate-400">
+                      {isRtl ? 'الخدمات المرتبطة للمشروع' : 'Delivered Services'}
+                    </h4>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedProject.services.map((svc: string) => (
+                        <span key={svc} className="px-3 py-1 bg-rose-50 text-rose-700 border border-rose-100 rounded-xl text-xs font-bold flex items-center gap-1.5">
+                          <Sparkles className="w-3.5 h-3.5 text-[#F20530]" />
+                          {svc}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>

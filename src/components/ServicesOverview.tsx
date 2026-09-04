@@ -198,6 +198,56 @@ function ServiceMediaCarousel({
   const totalSlides = slidesList.length;
   const currentSlide = slidesList[currentIndex] || slidesList[0];
 
+  const isDirectVideo = currentSlide?.type === 'video' && (
+    currentSlide.videoType === 'direct' ||
+    currentSlide.videoUrl?.startsWith('blob:') ||
+    currentSlide.videoUrl?.startsWith('data:video') ||
+    currentSlide.videoUrl?.endsWith('.mp4') ||
+    currentSlide.videoUrl?.endsWith('.webm') ||
+    currentSlide.videoUrl?.endsWith('.mov')
+  );
+
+  // Conditionally auto-play direct video ONLY when bounding box intersects with viewport
+  useEffect(() => {
+    const videoElement = videoRef.current;
+    if (!videoElement) return;
+
+    // Reset video state if it's a new slide
+    if (currentSlide?.type !== 'video' || !isDirectVideo) {
+      if (!videoElement.paused) videoElement.pause();
+      return;
+    }
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          // Pause others
+          document.querySelectorAll('video').forEach((v) => {
+            if (v !== videoElement && !v.paused) {
+              try { v.pause(); } catch { /* ignore */ }
+            }
+          });
+
+          videoElement.muted = true; // start muted for safe autoplay
+          videoElement.play().catch(() => {});
+        } else {
+          if (!videoElement.paused) {
+            try { videoElement.pause(); } catch { /* ignore */ }
+          }
+        }
+      });
+    }, { threshold: 0.5 });
+
+    observer.observe(videoElement);
+
+    return () => {
+      observer.disconnect();
+      if (videoElement && !videoElement.paused) {
+        try { videoElement.pause(); } catch { /* ignore */ }
+      }
+    };
+  }, [currentIndex, currentSlide, isDirectVideo, resolvedVideoUrls, totalSlides]);
+
   if (totalSlides === 0 || !currentSlide) {
     return (
       <div className="relative w-full overflow-hidden bg-slate-950 aspect-[16/10] flex flex-col items-center justify-center text-slate-500 gap-2 p-4">
@@ -231,39 +281,6 @@ function ServiceMediaCarousel({
     setIsLightboxOpen(true);
   };
 
-  const isDirectVideo = currentSlide?.type === 'video' && (
-    currentSlide.videoType === 'direct' ||
-    currentSlide.videoUrl?.startsWith('blob:') ||
-    currentSlide.videoUrl?.startsWith('data:video') ||
-    currentSlide.videoUrl?.endsWith('.mp4') ||
-    currentSlide.videoUrl?.endsWith('.webm') ||
-    currentSlide.videoUrl?.endsWith('.mov')
-  );
-
-  // Auto-play direct video smoothly with audio when active
-  useEffect(() => {
-    if (currentSlide?.type === 'video' && isDirectVideo && videoRef.current) {
-      videoRef.current.muted = false;
-      const playPromise = videoRef.current.play();
-      if (playPromise !== undefined) {
-        playPromise.catch(() => {
-          // If browser restricts unmuted autoplay before user gesture, play initially and unmute on first gesture
-          if (videoRef.current) {
-            videoRef.current.muted = true;
-            videoRef.current.play().catch(() => {});
-            const enableSound = () => {
-              if (videoRef.current) {
-                videoRef.current.muted = false;
-              }
-            };
-            window.addEventListener('click', enableSound, { once: true });
-            window.addEventListener('touchstart', enableSound, { once: true });
-          }
-        });
-      }
-    }
-  }, [currentIndex, currentSlide, isDirectVideo, resolvedVideoUrls]);
-
   return (
     <div className="relative w-full overflow-hidden bg-slate-950 aspect-[16/10] group/hero" onClick={(e) => e.stopPropagation()}>
       {/* Main Slide View (Image or Video) */}
@@ -279,7 +296,7 @@ function ServiceMediaCarousel({
                   className="w-full h-full max-h-full max-w-full object-contain mx-auto my-auto"
                   controls
                   playsInline
-                  autoPlay
+                  preload="metadata"
                   loop
                 />
               </div>
@@ -289,6 +306,8 @@ function ServiceMediaCarousel({
                   src={currentSlide.url}
                   alt={currentSlide.title}
                   className="w-full h-full object-contain opacity-90 group-hover/hero:scale-105 transition-transform duration-700 ease-out mx-auto my-auto"
+                  loading="lazy"
+                  decoding="async"
                 />
                 <div className="absolute inset-0 flex items-center justify-center bg-black/30 hover:bg-black/10 transition-colors">
                   <div className="w-14 h-14 rounded-full bg-[#F20530] text-white flex items-center justify-center shadow-2xl shadow-rose-950/60 hover:scale-115 transition-transform">
@@ -308,6 +327,8 @@ function ServiceMediaCarousel({
             exit={{ opacity: 0, scale: 0.96 }}
             transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
             className="w-full h-full object-cover object-center group-hover/hero:scale-105 transition-transform duration-700 ease-out"
+            loading="lazy"
+            decoding="async"
           />
         )}
       </AnimatePresence>

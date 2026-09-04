@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { useData } from '../context/DataContext';
 import { 
   MoreVertical,
   CheckCircle,
@@ -57,6 +58,7 @@ import {
 export function PortfolioManagement() {
   const { isRtl } = useLanguage();
   const { canPerform } = useAuth();
+  const { refreshDashboardStats } = useData();
 
   // API Data States
   const [projects, setProjects] = useState<LaravelProject[]>([]);
@@ -112,50 +114,18 @@ export function PortfolioManagement() {
     setIsUploadingMedia(true);
 
     try {
-      const formData = new FormData();
-      formData.append('file', file);
+      const result = await adminMediaApi.upload(file);
+      const newMedia: LaravelMedia = result.data || (result as any);
 
-      const token = localStorage.getItem('masterlink_admin_token');
-      const response = await fetch('/api/admin/media', {
-        method: 'POST',
-        headers: {
-          'Authorization': token ? `Bearer ${token}` : '',
-          'Accept': 'application/json',
-        },
-        body: formData,
-      });
-
-      if (!response.ok) {
-        throw new Error('Upload endpoint unavailable');
+      setAvailableMedia(prev => [newMedia, ...prev.filter(m => m.id !== newMedia.id)]);
+      setSelectedMediaIds(prev => Array.from(new Set([...prev, newMedia.id])));
+      triggerToast('تم رفع الملف وإضافته للمشروع بنجاح', 'success');
+    } catch (err: any) {
+      if (err?.status === 401) {
+        handle401Error();
+      } else {
+        triggerToast(err?.message || 'تعذر رفع الملف إلى السيرفر', 'danger');
       }
-
-      const result = await response.json();
-      const newMedia: LaravelMedia = result.data || result;
-
-      setAvailableMedia(prev => [newMedia, ...prev]);
-      setSelectedMediaIds(prev => [...prev, newMedia.id]);
-      triggerToast('تم رفع الصورة وإضافتها للمشروع بنجاح', 'success');
-    } catch {
-      // Fallback preview data URL for local selection
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const dataUrl = e.target?.result as string;
-        const localId = Date.now();
-        const fallbackMedia: LaravelMedia = {
-          id: localId,
-          file_name: file.name,
-          url: dataUrl,
-          extension: file.name.split('.').pop() || 'jpg',
-          media_type: 'image',
-          mime_type: file.type,
-          file_size: file.size,
-          alt_text: file.name
-        };
-        setAvailableMedia(prev => [fallbackMedia, ...prev]);
-        setSelectedMediaIds(prev => [...prev, localId]);
-        triggerToast('تم إضافة الصورة المحلية من جهازك للمشروع', 'success');
-      };
-      reader.readAsDataURL(file);
     } finally {
       setIsUploadingMedia(false);
     }
@@ -371,6 +341,7 @@ export function PortfolioManagement() {
     try {
       await adminProjectsApi.delete(deleteId);
       setProjects(prev => prev.filter(p => p.id !== deleteId));
+      refreshDashboardStats();
       triggerToast('تم حذف المشروع نهائياً من قاعدة البيانات بنجاح.', 'danger');
     } catch (err: any) {
       if (err?.status === 401) handle401Error();
@@ -443,6 +414,7 @@ export function PortfolioManagement() {
       }
 
       await fetchProjects();
+      refreshDashboardStats();
       triggerToast(editingProject ? 'تم تحديث بيانات المشروع والمرفقات بنجاح.' : 'تم إضافة المشروع الجديد والمرفقات بنجاح.');
 
       setIsEditorOpen(false);

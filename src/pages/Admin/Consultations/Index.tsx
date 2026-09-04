@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '../../../context/LanguageContext';
 import { useAuth } from '../../../context/AuthContext';
+import { useData } from '../../../context/DataContext';
 import { 
   adminConsultationsApi, 
   authApi, 
@@ -38,6 +39,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 export function Index() {
   const { isRtl } = useLanguage();
   const { canPerform } = useAuth();
+  const { refreshDashboardStats } = useData();
 
   // State
   const [consultations, setConsultations] = useState<LaravelConsultation[]>([]);
@@ -193,6 +195,7 @@ export function Index() {
         setSelectedConsultation(response.data);
       }
       fetchConsultations();
+      refreshDashboardStats();
     } catch (err: any) {
       if (err?.status === 401) {
         handle401Error();
@@ -217,6 +220,7 @@ export function Index() {
       }
       setConsultationToDelete(null);
       fetchConsultations();
+      refreshDashboardStats();
     } catch (err: any) {
       if (err?.status === 401) {
         handle401Error();

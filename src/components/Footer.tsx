@@ -37,11 +37,13 @@ export function Footer() {
     facebook: Facebook
   };
 
-  const socialLinks = settings.socials.map(s => ({
-    icon: socialIconMap[s.platform] || Twitter,
-    href: s.url,
-    name: s.platform
-  }));
+  const socialLinks = settings.socials
+    .filter(s => Boolean(s.url && typeof s.url === 'string' && s.url.trim() !== '' && s.url.trim() !== '#'))
+    .map(s => ({
+      icon: socialIconMap[s.platform] || Twitter,
+      href: s.url.trim(),
+      name: s.platform
+    }));
 
   const handleFooterLinkClick = (e: React.MouseEvent<HTMLAnchorElement>, href: string, isRoute?: boolean) => {
     e.preventDefault();
@@ -78,8 +80,8 @@ export function Footer() {
           <div className={`lg:col-span-4 space-y-6 ${isRtl ? 'text-right' : 'text-left'}`}>
             <Logo
               variant="footer"
-              className="h-20 sm:h-24 md:h-28 max-w-[280px]"
-              imgClassName="h-full w-auto max-w-full object-contain transition-all duration-300 drop-shadow-sm"
+              className="h-20 sm:h-24 md:h-28 max-w-[300px]"
+              imgClassName="h-full w-auto max-w-full object-contain scale-110 sm:scale-115 origin-left transition-all duration-300 drop-shadow-sm"
             />
             <p className="text-xs text-slate-600 font-normal leading-relaxed max-w-sm">
               {aboutText || t.footerAbout}

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useLanguage } from '../../../context/LanguageContext';
 import { useAuth } from '../../../context/AuthContext';
+import { useData } from '../../../context/DataContext';
 import { 
   adminAdminsApi, 
   authApi, 
@@ -35,6 +36,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 export function Index() {
   const { isRtl } = useLanguage();
   const { currentUser, canPerform, canAccess } = useAuth();
+  const { refreshDashboardStats } = useData();
 
   // State
   const [admins, setAdmins] = useState<LaravelAdminRecord[]>([]);
@@ -158,6 +160,7 @@ export function Index() {
 
       setIsModalOpen(false);
       await fetchAdmins();
+      refreshDashboardStats();
     } catch (err: any) {
       if (err?.status === 401) {
         handle401Error();
@@ -200,6 +203,7 @@ export function Index() {
         'success'
       );
       await fetchAdmins();
+      refreshDashboardStats();
     } catch (err: any) {
       triggerToast(err?.message || (isRtl ? 'حدث خطأ أثناء تغيير حالة الحساب.' : 'Failed to update status.'), 'error');
     }
@@ -222,6 +226,7 @@ export function Index() {
       setIsDeleteModalOpen(false);
       setAdminToDelete(null);
       await fetchAdmins();
+      refreshDashboardStats();
     } catch (err: any) {
       triggerToast(err?.message || (isRtl ? 'تعذر حذف الحساب (قد يكون مدير النظام الأخير).' : 'Failed to delete admin.'), 'error');
     } finally {

@@ -192,6 +192,8 @@ export interface ServiceItem {
 
 export interface ProjectItem {
   id: string;
+  categoryId?: number | string;
+  rawCategory?: any;
   titleEn: string;
   titleAr: string;
   nameEn?: string;
@@ -206,12 +208,16 @@ export interface ProjectItem {
   img?: string;
   clientEn: string;
   clientAr: string;
+  clientName?: string;
+  projectUrl?: string;
+  completionDate?: string;
   year?: string;
   date?: string;
   statsEn?: string;
   statsAr?: string;
   tags?: string[];
   services?: string[];
+  rawServices?: any[];
   featured?: boolean;
   status: 'published' | 'draft' | 'archived' | 'hidden';
   displayOrder?: number;
